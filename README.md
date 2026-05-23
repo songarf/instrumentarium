@@ -10,9 +10,9 @@
 
 | Платформа | Файл | Размер |
 |-----------|------|--------|
-| 🪟 Windows | `VideoDownloader-windows.zip` | ~20 MB |
-| 🐧 Linux | `VideoDownloader-linux.tar.gz` | ~20 MB |
-| 🍎 macOS | `VideoDownloader-macos.tar.gz` | ~20 MB |
+| 🪟 Windows | `Instrumentarium-windows.zip` | ~20 MB |
+| 🐧 Linux | `Instrumentarium-linux.tar.gz` | ~20 MB |
+| 🍎 macOS | `Instrumentarium-macos.tar.gz` | ~20 MB |
 
 **[Скачать последнюю версию](https://github.com/songarf/instrumentarium/releases/latest)**
 
@@ -21,21 +21,21 @@
 ## Как использовать
 
 ### Windows
-1. Скачай `VideoDownloader-windows.zip`
+1. Скачай `Instrumentarium-windows.zip`
 2. Распакуй в любую папку
-3. Запусти `VideoDownloader.exe` (двойной клик)
+3. Запусти `Instrumentarium.exe` (двойной клик)
 4. Вставь ссылку → выбери Видео или Аудио → **«⬇️ Скачать»**
 
 ### Linux
 ```bash
-tar xzf VideoDownloader-linux.tar.gz
-./VideoDownloader
+tar xzf Instrumentarium-linux.tar.gz
+./Instrumentarium
 ```
 
 ### macOS
 ```bash
-tar xzf VideoDownloader-macos.tar.gz
-./VideoDownloader
+tar xzf Instrumentarium-macos.tar.gz
+./Instrumentarium
 ```
 
 ---

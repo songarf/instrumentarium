@@ -48,7 +48,7 @@ start.bat
 ```bash
 pip install pyinstaller pywebview
 pyinstaller video-downloader.spec
-# Output: dist/VideoDownloader (standalone binary)
+# Output: dist/Instrumentarium (standalone binary)
 ```
 
 ### 🪟 Windows .exe
@@ -56,7 +56,7 @@ pyinstaller video-downloader.spec
 ```powershell
 pip install pyinstaller pywebview
 pyinstaller video-downloader-win.spec
-# Output: dist/VideoDownloader.exe
+# Output: dist/Instrumentarium.exe
 ```
 
 ### 🍎 macOS Binary
@@ -64,7 +64,7 @@ pyinstaller video-downloader-win.spec
 ```bash
 pip3 install pyinstaller pywebview
 pyinstaller video-downloader.spec
-# Output: dist/VideoDownloader
+# Output: dist/Instrumentarium
 ```
 
 ---
@@ -79,8 +79,8 @@ CI runs automatically on push to `main` or tag `v*`.
 3. **release** (tag v* only) — GitHub Release with all archives
 
 **Artifacts (portable, no installers):**
-- `VideoDownloader-linux.tar.gz`
-- `VideoDownloader-windows.zip`
-- `VideoDownloader-macos.tar.gz`
+- `Instrumentarium-linux.tar.gz`
+- `Instrumentarium-windows.zip`
+- `Instrumentarium-macos.tar.gz`
 
 Icons are pre-generated in git (`assets/icon.png`, `assets/icon.ico`) — no build step needed in CI.

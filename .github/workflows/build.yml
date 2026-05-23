@@ -37,20 +37,20 @@ jobs:
           - os: ubuntu-latest
             spec: video-downloader.spec
             artifact-name: linux
-            archive-cmd: tar czf VideoDownloader-linux.tar.gz VideoDownloader
-            archive-name: VideoDownloader-linux.tar.gz
+            archive-cmd: tar czf Instrumentarium-linux.tar.gz Instrumentarium
+            archive-name: Instrumentarium-linux.tar.gz
 
           - os: windows-latest
             spec: video-downloader-win.spec
             artifact-name: windows
-            archive-cmd: Compress-Archive -Path VideoDownloader.exe -DestinationPath VideoDownloader-windows.zip
-            archive-name: VideoDownloader-windows.zip
+            archive-cmd: Compress-Archive -Path Instrumentarium.exe -DestinationPath Instrumentarium-windows.zip
+            archive-name: Instrumentarium-windows.zip
 
           - os: macos-latest
             spec: video-downloader.spec
             artifact-name: macos
-            archive-cmd: tar czf VideoDownloader-macos.tar.gz VideoDownloader
-            archive-name: VideoDownloader-macos.tar.gz
+            archive-cmd: tar czf Instrumentarium-macos.tar.gz Instrumentarium
+            archive-name: Instrumentarium-macos.tar.gz
 
     runs-on: ${{ matrix.os }}
     steps:
