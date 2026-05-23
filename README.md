@@ -1,37 +1,64 @@
-# 🎬 Video Downloader
+# 🎬 Instrumentarium
 
-Скачивай видео с YouTube, Twitter/X, TikTok, Instagram, Facebook, LinkedIn и **1000+** других сайтов. Красивый UI, автоопределение платформы, прогресс-бар в реальном времени.
+**Скачивай видео с YouTube, Twitter/X, TikTok, Instagram, Facebook, LinkedIn и 1000+ других сайтов.**
 
-## Быстрый старт
+Портативное десктопное приложение. Распаковал → запустил → вставил ссылку → скачал. Без установщиков, без командной строки.
+
+---
+
+## ⬇️ Скачать
+
+| Платформа | Файл | Размер |
+|-----------|------|--------|
+| 🪟 Windows | `VideoDownloader-windows.zip` | ~20 MB |
+| 🐧 Linux | `VideoDownloader-linux.tar.gz` | ~20 MB |
+| 🍎 macOS | `VideoDownloader-macos.tar.gz` | ~20 MB |
+
+**[Скачать последнюю версию](https://github.com/songarf/instrumentarium/releases/latest)**
+
+---
+
+## Как использовать
 
 ### Windows
-Скачай `VideoDownloader-Setup.exe` → запусти → ярлык появится на рабочем столе.
+1. Скачай `VideoDownloader-windows.zip`
+2. Распакуй в любую папку
+3. Запусти `VideoDownloader.exe` (двойной клик)
+4. Вставь ссылку → выбери Видео или Аудио → **«⬇️ Скачать»**
 
 ### Linux
 ```bash
-chmod +x VideoDownloader
+tar xzf VideoDownloader-linux.tar.gz
 ./VideoDownloader
 ```
 
 ### macOS
-Открой `VideoDownloader.app` (перетащи в Applications при первом запуске).
+```bash
+tar xzf VideoDownloader-macos.tar.gz
+./VideoDownloader
+```
 
 ---
 
-Или без установки — просто запусти `start.bat` (Windows) / `start.sh` (Linux/macOS).
+## Первый запуск
 
-## Как это работает
+При первом запуске приложение автоматически скачает `yt-dlp` (утилита для загрузки видео). Интернет обязателен.
 
-1. Открой приложение
-2. При первом запуске — нажми **«🚀 Настроить и запустить»** (установит Python и yt-dlp)
-3. Вставь ссылку → выбери Видео или Аудио → **«⬇️ Скачать»**
-4. Видео сохраняется в папку `downloads/` рядом с приложением
+Видео сохраняются в папку `downloads/` рядом с приложением, разложенные по платформам:
+```
+downloads/
+├── youtube/
+├── twitter/
+├── tiktok/
+└── ...
+```
 
-## Требования
-
-- Python 3.7+ (установится автоматически при первом запуске)
-- Подключение к интернету
+---
 
 ## Сборка из исходников
 
 См. [BUILD.md](BUILD.md)
+
+## Лицензия
+
+MIT

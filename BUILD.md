@@ -1,16 +1,25 @@
-# 🎬 Video Downloader — Build Instructions
+# 🎬 Instrumentarium — Build Instructions
 
 ## Project Structure
 
 ```
-video-downloader/
-├── app.py                      # Desktop launcher (pywebview)
-├── server.py                   # Backend server (setup + yt-dlp)
-├── download.html               # UI (setup wizard + downloader)
+Instrumentarium/
+├── app.py                      # Desktop launcher (pywebview → native window 620×700)
+├── server.py                   # Backend: setup wizard + HTTP server (port 18765) + yt-dlp
+├── download.html               # UI: setup wizard + downloader (dark theme)
 ├── start.sh / start.bat        # Quick launch scripts (no build needed)
+├── assets/
+│   ├── icon.svg                # Source icon
+│   ├── icon.png                # Generated icon (512×512, in git)
+│   ├── icon.ico                # Generated icon (256×256, in git)
+│   └── icon_build.py           # SVG → .ico/.png converter (utility, not needed in CI)
+├── tests/
+│   └── test_server.py          # 22 tests (pytest)
 ├── video-downloader.spec       # PyInstaller spec (Linux/macOS)
 ├── video-downloader-win.spec   # PyInstaller spec (Windows)
-└── dist/                       # Build output
+├── pytest.ini                  # Pytest config
+├── .github/workflows/build.yml # CI/CD
+└── downloads/                  # Output folder (organized by platform)
 ```
 
 ## Prerequisites (all platforms)
@@ -22,7 +31,7 @@ video-downloader/
 
 ### Linux / macOS / WSL
 ```bash
-./start.sh
+bash start.sh
 ```
 
 ### Windows
@@ -32,160 +41,46 @@ start.bat
 
 ---
 
-## Building Installers
+## Building Portable Binaries
 
-### 🐧 Linux AppImage / Binary
+### 🐧 Linux Binary
 
 ```bash
 pip install pyinstaller pywebview
 pyinstaller video-downloader.spec
-# Output: dist/linux/VideoDownloader (20 MB standalone binary)
+# Output: dist/VideoDownloader (standalone binary)
 ```
 
-To create a `.deb` package:
-```bash
-# Install dpkg
-sudo apt install dpkg-dev
-
-# Create package structure
-mkdir -p video-downloader-pkg/usr/bin
-cp dist/linux/VideoDownloader video-downloader-pkg/usr/bin/video-downloader
-
-# Build .deb
-dpkg-deb --build video-downloader-pkg
-# Output: video-downloader-pkg.deb
-```
-
-### 🪟 Windows .exe + Installer
-
-**On a Windows machine:**
+### 🪟 Windows .exe
 
 ```powershell
-# 1. Install Python 3.7+ from python.org (check "Add to PATH")
-
-# 2. Install dependencies
 pip install pyinstaller pywebview
-
-# 3. Build
 pyinstaller video-downloader-win.spec
-# Output: dist\windows\VideoDownloader.exe
+# Output: dist/VideoDownloader.exe
 ```
 
-**To create an installer with desktop shortcut:**
-
-Option A — Inno Setup (recommended):
-```powershell
-# Download Inno Setup from https://jrsoftware.org/isinfo.php
-# Create a script (installer.iss) — see below
-# Compile with ISCC installer.iss
-```
-
-`installer.iss` template:
-```iss
-[Setup]
-AppName=Video Downloader
-AppVersion=1.0
-DefaultDirName={autopf}\VideoDownloader
-DefaultGroupName=Video Downloader
-OutputBaseFilename=VideoDownloader-Setup
-Compression=lzma
-SolidCompression=yes
-
-[Files]
-Source: "dist\windows\VideoDownloader.exe"; DestDir: "{app}"; DestName: "VideoDownloader.exe"
-
-[Icons]
-Name: "{autodesktop}\Video Downloader"; Filename: "{app}\VideoDownloader.exe"
-Name: "{group}\Video Downloader"; Filename: "{app}\VideoDownloader.exe"
-Name: "{group}\Uninstall Video Downloader"; Filename: "{uninstallexe}"
-```
-
-Option B — NSIS:
-```powershell
-# Install NSIS from https://nsis.sourceforge.io
-makensis installer.nsi
-```
-
-### 🍎 macOS .app + .dmg
-
-**On a macOS machine:**
+### 🍎 macOS Binary
 
 ```bash
-# 1. Install Python 3.7+
-brew install python3
-
-# 2. Install dependencies
 pip3 install pyinstaller pywebview
-
-# 3. Build .app bundle
-pyinstaller video-downloader.spec --osx-bundle-identifier com.soncra.videodownloader
-# Output: dist/macos/VideoDownloader.app
-```
-
-**To create a .dmg:**
-
-```bash
-# Install create-dmg
-brew install create-dmg
-
-create-dmg \
-  --volname "Video Downloader" \
-  --volicon "icon.icns" \
-  --window-pos 200 120 \
-  --window-size 600 400 \
-  --icon-size 100 \
-  --app-drop-link 425 178 \
-  "VideoDownloader.dmg" \
-  "dist/macos/VideoDownloader.app"
+pyinstaller video-downloader.spec
+# Output: dist/VideoDownloader
 ```
 
 ---
 
 ## GitHub Actions (Automated Cross-Platform Builds)
 
-Create `.github/workflows/build.yml`:
+CI runs automatically on push to `main` or tag `v*`.
 
-```yaml
-name: Build Installers
+**Pipeline:**
+1. **test** (ubuntu) — `python -m pytest tests/ -v`
+2. **build** (matrix: linux/windows/macos, fail-fast: false) — PyInstaller → portable archive
+3. **release** (tag v* only) — GitHub Release with all archives
 
-on:
-  push:
-    tags: ['v*']
+**Artifacts (portable, no installers):**
+- `VideoDownloader-linux.tar.gz`
+- `VideoDownloader-windows.zip`
+- `VideoDownloader-macos.tar.gz`
 
-jobs:
-  build:
-    strategy:
-      matrix:
-        os: [ubuntu-latest, windows-latest, macos-latest]
-    runs-on: ${{ matrix.os }}
-    steps:
-      - uses: actions/checkout@v4
-
-      - uses: actions/setup-python@v5
-        with:
-          python-version: '3.12'
-
-      - run: pip install pyinstaller pywebview
-
-      - name: Build (Linux)
-        if: runner.os == 'Linux'
-        run: pyinstaller video-downloader.spec
-
-      - name: Build (Windows)
-        if: runner.os == 'Windows'
-        run: pyinstaller video-downloader-win.spec
-
-      - name: Build (macOS)
-        if: runner.os == 'macOS'
-        run: pyinstaller video-downloader.spec --osx-bundle-identifier com.soncra.videodownloader
-
-      - uses: actions/upload-artifact@v4
-        with:
-          name: ${{ runner.os }}-build
-          path: dist/
-```
-
-This produces:
-- `dist/linux/VideoDownloader` — Linux binary
-- `dist/windows/VideoDownloader.exe` — Windows executable  
-- `dist/macos/VideoDownloader.app` — macOS app bundle
+Icons are pre-generated in git (`assets/icon.png`, `assets/icon.ico`) — no build step needed in CI.
