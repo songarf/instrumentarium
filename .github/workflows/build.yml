@@ -27,58 +27,28 @@ jobs:
       - name: Run tests
         run: python -m pytest tests/ -v
 
-  build-icons:
-    runs-on: ubuntu-latest
-    outputs:
-      icon-exists: ${{ steps.check.outputs.exists }}
-    steps:
-      - uses: actions/checkout@v4
-
-      - name: Check for icon assets
-        id: check
-        run: |
-          if [ -f assets/icon.svg ]; then
-            echo "exists=true" >> "$GITHUB_OUTPUT"
-          else
-            echo "exists=false" >> "$GITHUB_OUTPUT"
-          fi
-
-      - name: Generate platform icons
-        if: steps.check.outputs.exists == 'true'
-        run: |
-          pip install cairosvg Pillow
-          python assets/icon_build.py
-
-      - uses: actions/upload-artifact@v4
-        if: steps.check.outputs.exists == 'true'
-        with:
-          name: icons
-          path: assets/icon.ico
-          retention-days: 1
-
   build:
-    needs: [test, build-icons]
+    needs: [test]
+    # Always run even if upstream jobs are skipped (never "skipped" itself)
+    if: always() && needs.test.result != 'failure'
     strategy:
       matrix:
         include:
           - os: ubuntu-latest
             spec: video-downloader.spec
             artifact-name: linux
-            artifact-path: dist/VideoDownloader
             archive-cmd: tar czf VideoDownloader-linux.tar.gz VideoDownloader
             archive-name: VideoDownloader-linux.tar.gz
 
           - os: windows-latest
             spec: video-downloader-win.spec
             artifact-name: windows
-            artifact-path: dist/VideoDownloader.exe
             archive-cmd: Compress-Archive -Path VideoDownloader.exe -DestinationPath VideoDownloader-windows.zip
             archive-name: VideoDownloader-windows.zip
 
           - os: macos-latest
             spec: video-downloader.spec
             artifact-name: macos
-            artifact-path: dist/VideoDownloader
             archive-cmd: tar czf VideoDownloader-macos.tar.gz VideoDownloader
             archive-name: VideoDownloader-macos.tar.gz
 
@@ -90,12 +60,12 @@ jobs:
         with:
           python-version: '3.12'
 
-      - name: Download icons
-        uses: actions/download-artifact@v4
-        with:
-          name: icons
-          path: assets/
-        continue-on-error: true
+      - name: Build icons (SVG → .ico/.png)
+        run: |
+          if [ -f assets/icon.svg ]; then
+            pip install cairosvg Pillow
+            python assets/icon_build.py
+          fi
 
       - name: Install build deps
         run: |
@@ -124,7 +94,7 @@ jobs:
 
   release:
     if: startsWith(github.ref, 'refs/tags/v')
-    needs: build
+    needs: [build]
     runs-on: ubuntu-latest
     permissions:
       contents: write

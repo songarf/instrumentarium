@@ -10,7 +10,6 @@ a = Analysis(
     datas=[
         ('download.html', '.'),
         ('server.py', '.'),
-        ('assets/icon.png', '.'),
     ],
     hiddenimports=['webview', 'bottle', 'proxy_tools'],
     hookspath=[],
