@@ -1,0 +1,73 @@
+# ═══════════════════════════════════════════════════════════════
+#  GitHub Actions: Build Video Downloader for all platforms
+#  Triggers on push to main or tag v*
+# ═══════════════════════════════════════════════════════════════
+
+name: Build Installers
+
+on:
+  push:
+    branches: [main]
+    tags: ['v*']
+  workflow_dispatch:
+
+jobs:
+  # ── Linux ─────────────────────────────────────────────────
+  build-linux:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - run: pip install pyinstaller pywebview
+
+      - run: pyinstaller video-downloader.spec --distpath dist/linux --workpath build/linux
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: linux-binary
+          path: dist/linux/VideoDownloader
+          retention-days: 30
+
+  # ── Windows ───────────────────────────────────────────────
+  build-windows:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - run: pip install pyinstaller pywebview
+
+      - run: pyinstaller video-downloader-win.spec --distpath dist/windows --workpath build/windows
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: windows-exe
+          path: dist/windows/VideoDownloader.exe
+          retention-days: 30
+
+  # ── macOS ─────────────────────────────────────────────────
+  build-macos:
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - run: pip install pyinstaller pywebview
+
+      - run: pyinstaller video-downloader.spec --distpath dist/macos --workpath build/macos
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: macos-binary
+          path: dist/macos/VideoDownloader
+          retention-days: 30

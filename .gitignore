@@ -1,0 +1,36 @@
+# Build artifacts
+build/
+dist/
+__pycache__/
+*.pyc
+*.pyo
+*.egg-info/
+.eggs/
+
+# Virtual environments
+venv/
+.venv/
+env/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Output videos
+downloads/
+.bin/
+*.mp4
+*.mp3
+*.webm
+*.mkv
+*.m4a
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Secrets
+.env
+auth.json

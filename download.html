@@ -1,0 +1,399 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>🎬 Video Downloader</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    background: #0f0f1a;
+    color: #e0e0e0;
+    min-height: 100vh;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .card {
+    background: #1a1a2e;
+    border: 1px solid #2a2a4a;
+    border-radius: 16px;
+    padding: 40px;
+    width: 540px;
+    max-width: 95vw;
+    box-shadow: 0 20px 60px rgba(0,0,0,.5);
+  }
+
+  h1 { font-size: 1.4rem; margin-bottom: 6px; color: #fff; }
+  .subtitle { font-size: .82rem; color: #666; margin-bottom: 28px; line-height: 1.5; }
+
+  /* ── Setup screen ──────────────────────────────────────── */
+  .setup-screen { text-align: center; }
+
+  .setup-icon {
+    font-size: 3.5rem; margin-bottom: 16px;
+    animation: pulse 2s ease-in-out infinite;
+  }
+  @keyframes pulse {
+    0%, 100% { transform: scale(1); }
+    50% { transform: scale(1.08); }
+  }
+
+  .setup-title { font-size: 1.15rem; color: #fff; margin-bottom: 8px; }
+  .setup-desc { font-size: .82rem; color: #888; margin-bottom: 28px; line-height: 1.6; }
+
+  .setup-btn {
+    display: inline-flex; align-items: center; gap: 10px;
+    padding: 14px 36px;
+    background: linear-gradient(135deg, #6c5ce7, #a78bfa);
+    border: none; border-radius: 12px; color: #fff;
+    font-size: 1.05rem; font-weight: 600; cursor: pointer;
+    transition: transform .15s, box-shadow .15s;
+  }
+  .setup-btn:hover { transform: translateY(-2px); box-shadow: 0 8px 28px rgba(108,92,231,.45); }
+  .setup-btn:disabled { opacity: .5; cursor: wait; transform: none; box-shadow: none; }
+
+  /* ── Progress ───────────────────────────────────────────── */
+  .progress-section { margin-top: 24px; text-align: left; }
+
+  .progress-bg {
+    background: #12122a; border-radius: 8px; height: 8px; overflow: hidden;
+  }
+  .progress-bar {
+    height: 100%; width: 0%;
+    background: linear-gradient(90deg, #6c5ce7, #a78bfa, #6c5ce7);
+    background-size: 200% 100%;
+    border-radius: 8px;
+    transition: width .5s ease;
+    animation: shimmer 1.5s linear infinite;
+  }
+  @keyframes shimmer {
+    0% { background-position: 200% 0; }
+    100% { background-position: -200% 0; }
+  }
+
+  .progress-label {
+    display: flex; justify-content: space-between; align-items: center;
+    margin-top: 8px; font-size: .78rem;
+  }
+  .progress-pct { color: #a78bfa; font-weight: 600; }
+  .progress-status { color: #888; }
+
+  /* ── Log ────────────────────────────────────────────────── */
+  .log-area {
+    margin-top: 16px; background: #0d0d1f; border: 1px solid #2a2a4a;
+    border-radius: 10px; max-height: 220px; overflow-y: auto;
+    padding: 12px 16px; font-family: 'JetBrains Mono', 'Fira Code', monospace;
+    font-size: .76rem; line-height: 1.7;
+  }
+  .log-line { color: #666; }
+  .log-line.ok { color: #2ed573; }
+  .log-line.err { color: #ff4757; }
+  .log-line.info { color: #a78bfa; }
+
+  /* ── Download screen ────────────────────────────────────── */
+  .download-screen { display: none; }
+
+  label {
+    display: block; font-size: .78rem; text-transform: uppercase;
+    letter-spacing: .08em; color: #888; margin-bottom: 8px;
+  }
+
+  input[type="url"] {
+    width: 100%; background: #12122a; border: 1px solid #2a2a4a;
+    border-radius: 10px; padding: 12px 16px; color: #e0e0e0;
+    font-size: .95rem; outline: none; transition: border .2s; margin-bottom: 16px;
+  }
+  input[type="url"]:focus { border-color: #6c5ce7; }
+  input[type="url"]::placeholder { color: #444; }
+
+  .platform-badge {
+    display: inline-block; background: #12122a; border: 1px solid #2a2a4a;
+    border-radius: 6px; padding: 3px 10px; font-size: .75rem; color: #888;
+    margin-bottom: 18px; opacity: 0; transition: opacity .3s;
+  }
+  .platform-badge.visible { opacity: 1; }
+  .platform-youtube { color: #ff4757; border-color: #ff4757; }
+  .platform-twitter { color: #1da1f2; border-color: #1da1f2; }
+  .platform-tiktok { color: #ff0050; border-color: #ff0050; }
+  .platform-instagram { color: #e1306c; border-color: #e1306c; }
+  .platform-facebook { color: #1877f2; border-color: #1877f2; }
+  .platform-linkedin { color: #0077b5; border-color: #0077b5; }
+  .platform-other { color: #a78bfa; border-color: #a78bfa; }
+
+  .options { display: flex; gap: 12px; margin-bottom: 24px; }
+  .opt-btn {
+    flex: 1; background: #12122a; border: 1px solid #2a2a4a;
+    border-radius: 10px; padding: 14px 10px; text-align: center;
+    cursor: pointer; transition: all .2s; font-size: .85rem; color: #888;
+    user-select: none;
+  }
+  .opt-btn:hover { border-color: #4a4a6a; color: #ccc; }
+  .opt-btn.active { border-color: #6c5ce7; background: #1a1040; color: #a78bfa; }
+  .opt-btn .icon { font-size: 1.5rem; display: block; margin-bottom: 5px; }
+
+  .dl-btn {
+    width: 100%; padding: 14px;
+    background: linear-gradient(135deg, #6c5ce7, #a78bfa);
+    border: none; border-radius: 10px; color: #fff;
+    font-size: 1rem; font-weight: 600; cursor: pointer;
+    transition: transform .15s, box-shadow .15s;
+  }
+  .dl-btn:hover { transform: translateY(-2px); box-shadow: 0 8px 24px rgba(108,92,231,.4); }
+  .dl-btn:disabled { opacity: .5; cursor: wait; transform: none; box-shadow: none; }
+
+  .dl-progress { margin-top: 18px; }
+  .dl-status { font-size: .82rem; color: #888; margin-top: 8px; }
+
+  .footer {
+    margin-top: 20px; font-size: .72rem; color: #444; text-align: center;
+  }
+
+  /* ── Transitions ────────────────────────────────────────── */
+  .fade-in { animation: fadeIn .4s ease; }
+  @keyframes fadeIn { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
+</style>
+</head>
+<body>
+<div class="card">
+
+  <!-- ═══════════════════════════════════════════════════════ -->
+  <!-- SETUP SCREEN                                           -->
+  <!-- ═══════════════════════════════════════════════════════ -->
+  <div class="setup-screen" id="setupScreen">
+    <div class="setup-icon">⚙️</div>
+    <div class="setup-title">Первоначальная настройка</div>
+    <div class="setup-desc">
+      Проверим и установим всё необходимое для скачивания видео.<br>
+      Python 3.7+, yt-dlp и папка для загрузок — всё автоматически.
+    </div>
+    <button class="setup-btn" id="setupBtn" onclick="startSetup()">
+      🚀 Настроить и запустить
+    </button>
+
+    <div class="progress-section" id="setupProgress" style="display:none">
+      <div class="progress-bg"><div class="progress-bar" id="setupBar"></div></div>
+      <div class="progress-label">
+        <span class="progress-status" id="setupStatus">Проверяю…</span>
+        <span class="progress-pct" id="setupPct">0%</span>
+      </div>
+      <div class="log-area" id="setupLog"></div>
+    </div>
+  </div>
+
+  <!-- ═══════════════════════════════════════════════════════ -->
+  <!-- DOWNLOAD SCREEN                                        -->
+  <!-- ═══════════════════════════════════════════════════════ -->
+  <div class="download-screen" id="downloadScreen">
+    <h1>🎬 Video Downloader</h1>
+    <p class="subtitle">Скачай видео с YouTube, Twitter/X, TikTok, Instagram, Facebook, LinkedIn и 1000+ сайтов</p>
+
+    <label>Ссылка на видео</label>
+    <input type="url" id="url" placeholder="https://youtube.com/watch?v=…" autocomplete="off" autofocus>
+    <div class="platform-badge" id="badge">…</div>
+
+    <div class="options">
+      <div class="opt-btn active" id="optVideo" onclick="setMode('video')">
+        <span class="icon">🎥</span>Видео (MP4)
+      </div>
+      <div class="opt-btn" id="optAudio" onclick="setMode('audio')">
+        <span class="icon">🎵</span>Аудио (MP3)
+      </div>
+    </div>
+
+    <button class="dl-btn" id="dlBtn" onclick="download()">⬇️ Скачать</button>
+
+    <div class="dl-progress" id="dlProgress" style="display:none">
+      <div class="progress-bg"><div class="progress-bar" id="dlBar"></div></div>
+      <div class="dl-status" id="dlStatus"></div>
+      <div class="log-area" id="dlLog"></div>
+    </div>
+
+    <p class="footer">Готово к работе ✅</p>
+  </div>
+
+</div>
+
+<script>
+/* ── Platform detect ─────────────────────────────────────── */
+const PLATS = [
+  { name:'youtube',   hosts:['youtube.com','youtu.be'] },
+  { name:'twitter',   hosts:['twitter.com','x.com'] },
+  { name:'tiktok',    hosts:['tiktok.com'] },
+  { name:'instagram', hosts:['instagram.com'] },
+  { name:'facebook',  hosts:['facebook.com','fb.com','fb.watch'] },
+  { name:'linkedin',  hosts:['linkedin.com'] },
+];
+const PLAT_CLS = { youtube:'platform-youtube', twitter:'platform-twitter', tiktok:'platform-tiktok',
+  instagram:'platform-instagram', facebook:'platform-facebook', linkedin:'platform-linkedin', other:'platform-other' };
+const PLAT_LBL = { youtube:'🔴 YouTube', twitter:'🐦 Twitter/X', tiktok:'🎵 TikTok',
+  instagram:'📸 Instagram', facebook:'📘 Facebook', linkedin:'💼 LinkedIn', other:'🌐 Другое' };
+
+function detectPlatform(url) {
+  const u = url.toLowerCase();
+  for (const p of PLATS) for (const h of p.hosts) if (u.includes(h)) return p.name;
+  return 'other';
+}
+function updateBadge(url) {
+  const b = document.getElementById('badge');
+  if (!url) { b.classList.remove('visible'); return; }
+  const p = detectPlatform(url);
+  b.textContent = 'Платформа: ' + (PLAT_LBL[p] || p);
+  b.className = 'platform-badge visible ' + (PLAT_CLS[p] || '');
+}
+document.getElementById('url').addEventListener('input', e => updateBadge(e.target.value));
+document.getElementById('url').addEventListener('paste', () =>
+  setTimeout(() => updateBadge(document.getElementById('url').value), 50));
+
+/* ── Mode ─────────────────────────────────────────────────── */
+let mode = 'video';
+function setMode(m) {
+  mode = m;
+  document.getElementById('optVideo').classList.toggle('active', m === 'video');
+  document.getElementById('optAudio').classList.toggle('active', m === 'audio');
+}
+
+/* ── Setup wizard ─────────────────────────────────────────── */
+let setupPoll = null;
+
+function startSetup() {
+  const btn = document.getElementById('setupBtn');
+  btn.disabled = true;
+  btn.textContent = '⏳ Настраиваю…';
+
+  document.getElementById('setupProgress').style.display = 'block';
+  document.getElementById('setupProgress').classList.add('fade-in');
+  document.getElementById('setupLog').classList.add('visible');
+
+  // Start setup on server
+  fetch('/setup', { method: 'POST' }).then(r => r.json()).then(() => {
+    setupPoll = setInterval(pollSetup, 800);
+  }).catch(err => {
+    addLog('setupLog', '❌ Не удалось связаться с сервером: ' + err.message, 'err');
+    btn.disabled = false;
+    btn.textContent = '🔄 Попробовать снова';
+  });
+}
+
+function pollSetup() {
+  fetch('/status').then(r => r.json()).then(d => {
+    document.getElementById('setupBar').style.width = (d.progress || 0) + '%';
+    document.getElementById('setupPct').textContent = (d.progress || 0) + '%';
+
+    // Phase labels
+    const PHASE_LABELS = {
+      checking: '🔍 Проверяю зависимости…',
+      installing_python: '🐍 Устанавливаю Python…',
+      installing_ytdlp: '📦 Скачиваю yt-dlp…',
+      done: '✅ Всё готово!',
+      error: '❌ Ошибка',
+    };
+    document.getElementById('setupStatus').textContent = PHASE_LABELS[d.phase] || d.phase;
+
+    // Messages
+    if (d.messages) {
+      const log = document.getElementById('setupLog');
+      const prevLen = log.children.length;
+      d.messages.slice(prevLen).forEach(m => {
+        addLog('setupLog', m.text, m.type);
+      });
+    }
+
+    if (d.phase === 'done') {
+      clearInterval(setupPoll);
+      document.getElementById('setupStatus').textContent = '✅ Всё готово! Открываю…';
+      setTimeout(() => {
+        document.getElementById('setupScreen').style.display = 'none';
+        document.getElementById('downloadScreen').style.display = 'block';
+        document.getElementById('downloadScreen').classList.add('fade-in');
+      }, 1200);
+    }
+
+    if (d.phase === 'error') {
+      clearInterval(setupPoll);
+      const btn = document.getElementById('setupBtn');
+      btn.disabled = false;
+      btn.textContent = '🔄 Попробовать снова';
+    }
+  }).catch(() => {});
+}
+
+/* ── Download ─────────────────────────────────────────────── */
+let dlPoll = null;
+
+function download() {
+  const url = document.getElementById('url').value.trim();
+  if (!url) { addLog('dlLog', '⚠️ Введи ссылку', 'err'); return; }
+
+  document.getElementById('dlProgress').style.display = 'block';
+  document.getElementById('dlProgress').classList.add('fade-in');
+  document.getElementById('dlLog').classList.add('visible');
+  document.getElementById('dlLog').innerHTML = '';
+  document.getElementById('dlBar').style.width = '5%';
+  document.getElementById('dlStatus').textContent = 'Запуск…';
+
+  const btn = document.getElementById('dlBtn');
+  btn.disabled = true; btn.textContent = '⏳ Скачивание…';
+
+  fetch('/download', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ url, mode })
+  })
+  .then(r => r.json())
+  .then(data => {
+    if (data.error) {
+      addLog('dlLog', '❌ ' + data.error, 'err');
+      btn.disabled = false; btn.textContent = '⬇️ Скачать';
+      return;
+    }
+    addLog('dlLog', `📦 Платформа: ${data.platform}`, 'info');
+    addLog('dlLog', '🚀 Загруза запущена…', '');
+    let offset = 0;
+    dlPoll = setInterval(() => {
+      fetch('/log?job=' + data.job_id + '&offset=' + offset)
+        .then(r => r.json())
+        .then(d => {
+          if (d.lines) {
+            d.lines.forEach(l => {
+              const cls = l.includes('error') || l.includes('Error') ? 'err'
+                        : l.includes('done') || l.includes('100') ? 'ok'
+                        : l.includes('[') ? 'info' : '';
+              addLog('dlLog', l, cls);
+            });
+            offset += d.lines.length;
+          }
+          if (d.status === 'done' || d.status === 'error') {
+            clearInterval(dlPoll);
+            document.getElementById('dlBar').style.width = '100%';
+            document.getElementById('dlStatus').textContent = d.status === 'done' ? '✅ Готово!' : '❌ Ошибка';
+            btn.disabled = false; btn.textContent = '⬇️ Скачать';
+          } else {
+            const bar = document.getElementById('dlBar');
+            const cur = parseFloat(bar.style.width);
+            if (cur < 92) bar.style.width = (cur + Math.random() * 6) + '%';
+          }
+        }).catch(() => {});
+    }, 1500);
+  })
+  .catch(err => {
+    addLog('dlLog', '❌ ' + err.message, 'err');
+    btn.disabled = false; btn.textContent = '⬇️ Скачать';
+  });
+}
+
+/* ── Log helper ───────────────────────────────────────────── */
+function addLog(containerId, text, type) {
+  const el = document.getElementById(containerId);
+  const d = document.createElement('div');
+  d.className = 'log-line ' + (type || '');
+  d.textContent = text;
+  el.appendChild(d);
+  el.scrollTop = el.scrollHeight;
+}
+</script>
+</body>
+</html>
