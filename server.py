@@ -4,8 +4,11 @@ Video Downloader — Setup Wizard + Server
 Checks dependencies, installs yt-dlp, starts the server, opens browser.
 """
 
-import http.server, json, os, platform, shutil, ssl, subprocess, sys, threading, time, urllib.request, uuid, zipfile
+import http.server, json, logging, os, platform, shutil, ssl, subprocess, sys, threading, time, urllib.request, uuid, zipfile
 from urllib.parse import urlparse, parse_qs
+
+# ── Logging ──────────────────────────────────────────────────────────
+log = logging.getLogger("instrumentarium.server")
 
 def _safe_print(*args, **kwargs):
     """Print safely — skip when stdout is None (PyInstaller console=False on Windows)."""
@@ -84,6 +87,7 @@ def install_ytdlp():
 
     setup_state["phase"] = "installing_ytdlp"
     msg(f"⬇️  Скачиваю yt-dlp…", "info")
+    log.info("Downloading yt-dlp from %s", url)
     setup_state["progress"] = 50
 
     try:
@@ -92,10 +96,12 @@ def install_ytdlp():
             os.chmod(YT_DLP, 0o755)
         ver = subprocess.check_output([YT_DLP, "--version"], stderr=subprocess.STDOUT, text=True).strip()
         msg(f"✅ yt-dlp {ver} установлен", "ok")
+        log.info("yt-dlp %s installed at %s", ver, YT_DLP)
         setup_state["progress"] = 70
         return True
     except Exception as e:
         msg(f"❌ Ошибка загрузки yt-dlp: {e}", "err")
+        log.error("yt-dlp installation failed: %s", e)
         setup_state["error"] = str(e)
         setup_state["phase"] = "error"
         return False
@@ -140,11 +146,13 @@ def install_python():
     url = get_python_install_url()
     if not url:
         msg("❌ Не удалось определить ссылку для скачивания Python", "err")
+        log.error("Could not determine Python download URL for %s", system)
         setup_state["phase"] = "error"
         return False
 
     installer_path = os.path.join(SCRIPT_DIR, "python_installer.exe")
     msg(f"⬇️  Скачиваю Python 3.12… (~25 MB)", "info")
+    log.info("Downloading Python 3.12 from %s", url)
     setup_state["progress"] = 10
 
     try:
@@ -155,6 +163,7 @@ def install_python():
 
         urllib.request.urlretrieve(url, installer_path, reporthook)
         msg("✅ Python скачен. Запускаю установщик…", "ok")
+        log.info("Python installer downloaded, running setup…")
         setup_state["progress"] = 55
         setup_state["phase"] = "installing_python"
 
@@ -166,6 +175,7 @@ def install_python():
             "Include_pip=1",
         ])
         msg("✅ Python установлен! Перезапусти приложение вручную.", "ok")
+        log.info("Python installed successfully — user should relaunch")
         setup_state["progress"] = 100
         setup_state["phase"] = "done"
         setup_state["python_ok"] = True
@@ -175,6 +185,7 @@ def install_python():
     except Exception as e:
         msg(f"❌ Ошибка установки Python: {e}", "err")
         msg(f"   Скачай вручную: {url}", "info")
+        log.error("Python installation failed: %s", e)
         setup_state["phase"] = "error"
         setup_state["error"] = str(e)
         return False
@@ -187,41 +198,49 @@ def run_setup():
     setup_state["messages"] = []
     setup_state["error"] = None
 
+    log.info("Setup started")
     msg("🔍 Проверяю зависимости…", "info")
     setup_state["progress"] = 5
 
     # ── Step 1: Python ───────────────────────────────────────────
     py_path, py_ver = find_system_python()
     if py_path:
+        log.info("Python found: %s (%s)", py_path, py_ver)
         msg(f"✅ {py_ver} найден: {py_path}", "ok")
         setup_state["python_ok"] = True
         setup_state["progress"] = 30
     else:
+        log.warning("Python 3.7+ not found")
         msg("❌ Python 3.7+ не найден", "err")
         setup_state["python_ok"] = False
-        # Try to install (Windows) or show instructions (Linux/Mac)
         if not install_python():
-            return  # will re-launch on Windows after install
+            log.error("Python installation failed or not available")
+            return
 
     # ── Step 2: yt-dlp ───────────────────────────────────────────
     ok, ver = check_ytdlp()
     if ok:
+        log.info("yt-dlp found: %s", ver)
         msg(f"✅ yt-dlp {ver} найден", "ok")
         setup_state["ytdlp_ok"] = True
         setup_state["progress"] = 70
     else:
+        log.info("yt-dlp not found, downloading...")
         msg("⚠️  yt-dlp не найден, скачиваю…", "info")
         if not install_ytdlp():
+            log.error("yt-dlp installation failed")
             return
 
     # ── Step 3: Ready ────────────────────────────────────────────
     setup_state["progress"] = 90
+    log.info("Creating downloads directory: %s", OUTPUT_BASE)
     msg("📁 Создаю папку для загрузок…", "info")
     os.makedirs(OUTPUT_BASE, exist_ok=True)
     msg(f"✅ Готово! Запускаю сервер на порту {PORT}…", "ok")
     setup_state["progress"] = 100
     setup_state["phase"] = "done"
     setup_state["server_started"] = True
+    log.info("Setup complete — server ready on port %d", PORT)
 
 # ── HTTP handler ────────────────────────────────────────────────────
 class Handler(http.server.BaseHTTPRequestHandler):
