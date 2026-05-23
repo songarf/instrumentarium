@@ -1,9 +1,9 @@
 # ═══════════════════════════════════════════════════════════════
-#  GitHub Actions: Build Video Downloader for all platforms
+#  GitHub Actions: Build portable binaries for all platforms
 #  Triggers on push to main or tag v*
 # ═══════════════════════════════════════════════════════════════
 
-name: Build Installers
+name: Build Portable Binaries
 
 on:
   push:
@@ -12,9 +12,62 @@ on:
   workflow_dispatch:
 
 jobs:
-  # ── Linux ─────────────────────────────────────────────────
-  build-linux:
+  build-icons:
     runs-on: ubuntu-latest
+    outputs:
+      icon-exists: ${{ steps.check.outputs.exists }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Check for icon assets
+        id: check
+        run: |
+          if [ -f assets/icon.svg ]; then
+            echo "exists=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "exists=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Generate platform icons
+        if: steps.check.outputs.exists == 'true'
+        run: |
+          pip install cairosvg Pillow
+          python assets/icon_build.py
+
+      - uses: actions/upload-artifact@v4
+        if: steps.check.outputs.exists == 'true'
+        with:
+          name: icons
+          path: assets/icon.ico
+          retention-days: 1
+
+  build:
+    needs: build-icons
+    strategy:
+      matrix:
+        include:
+          - os: ubuntu-latest
+            spec: video-downloader.spec
+            artifact-name: linux
+            artifact-path: dist/VideoDownloader
+            archive-cmd: tar czf VideoDownloader-linux.tar.gz VideoDownloader
+            archive-name: VideoDownloader-linux.tar.gz
+
+          - os: windows-latest
+            spec: video-downloader-win.spec
+            artifact-name: windows
+            artifact-path: dist/VideoDownloader.exe
+            archive-cmd: Compress-Archive -Path VideoDownloader.exe -DestinationPath VideoDownloader-windows.zip
+            archive-name: VideoDownloader-windows.zip
+
+          - os: macos-latest
+            spec: video-downloader.spec
+            artifact-name: macos
+            artifact-path: dist/VideoDownloader
+            archive-cmd: tar czf VideoDownloader-macos.tar.gz VideoDownloader
+            archive-name: VideoDownloader-macos.tar.gz
+
+    runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v4
 
@@ -22,52 +75,52 @@ jobs:
         with:
           python-version: '3.12'
 
-      - run: pip install pyinstaller pywebview
+      - name: Download icons
+        uses: actions/download-artifact@v4
+        with:
+          name: icons
+          path: assets/
+        continue-on-error: true
 
-      - run: pyinstaller video-downloader.spec --distpath dist/linux --workpath build/linux
+      - name: Install build deps
+        run: |
+          pip install pyinstaller pywebview
+
+      - name: Build binary
+        run: pyinstaller ${{ matrix.spec }} --distpath dist --workpath build
+
+      - name: Prepare archive
+        shell: ${{ matrix.os == 'windows-latest' && 'pwsh' || 'bash' }}
+        working-directory: dist
+        run: ${{ matrix.archive-cmd }}
 
       - uses: actions/upload-artifact@v4
         with:
-          name: linux-binary
-          path: dist/linux/VideoDownloader
+          name: ${{ matrix.artifact-name }}
+          path: dist/${{ matrix.archive-name }}
           retention-days: 30
 
-  # ── Windows ───────────────────────────────────────────────
-  build-windows:
-    runs-on: windows-latest
+  release:
+    if: startsWith(github.ref, 'refs/tags/v')
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
     steps:
-      - uses: actions/checkout@v4
-
-      - uses: actions/setup-python@v5
+      - name: Download all artifacts
+        uses: actions/download-artifact@v4
         with:
-          python-version: '3.12'
+          path: release-artifacts
 
-      - run: pip install pyinstaller pywebview
+      - name: Prepare release files
+        run: |
+          mkdir -p release-files
+          find release-artifacts -type f \( -name "*.tar.gz" -o -name "*.zip" \) -exec cp {} release-files/ \;
+          ls -la release-files/
 
-      - run: pyinstaller video-downloader-win.spec --distpath dist/windows --workpath build/windows
-
-      - uses: actions/upload-artifact@v4
+      - name: Create Release
+        uses: softprops/action-gh-release@v2
         with:
-          name: windows-exe
-          path: dist/windows/VideoDownloader.exe
-          retention-days: 30
-
-  # ── macOS ─────────────────────────────────────────────────
-  build-macos:
-    runs-on: macos-latest
-    steps:
-      - uses: actions/checkout@v4
-
-      - uses: actions/setup-python@v5
-        with:
-          python-version: '3.12'
-
-      - run: pip install pyinstaller pywebview
-
-      - run: pyinstaller video-downloader.spec --distpath dist/macos --workpath build/macos
-
-      - uses: actions/upload-artifact@v4
-        with:
-          name: macos-binary
-          path: dist/macos/VideoDownloader
-          retention-days: 30
+          files: release-files/*
+          generate_release_notes: true
+          make_latest: true

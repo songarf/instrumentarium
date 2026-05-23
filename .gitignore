@@ -34,3 +34,6 @@ Thumbs.db
 # Secrets
 .env
 auth.json
+
+# Project context (local notes)
+CONTEXT.md

@@ -1,4 +1,4 @@
-# Video Downloader — PyInstaller spec
+# Video Downloader — PyInstaller spec (Linux/macOS)
 # Build: pyinstaller video-downloader.spec
 
 block_cipher = None
@@ -10,6 +10,7 @@ a = Analysis(
     datas=[
         ('download.html', '.'),
         ('server.py', '.'),
+        ('assets/icon.png', '.'),
     ],
     hiddenimports=['webview', 'bottle', 'proxy_tools'],
     hookspath=[],
@@ -38,10 +39,11 @@ exe = EXE(
     upx=True,
     upx_exclude=[],
     runtime_tmpdir=None,
-    console=False,           # no terminal window
+    console=False,
     disable_windowed_traceback=False,
     argv_emulation=False,
     target_arch=None,
     codesign_identity=None,
     entitlements_file=None,
+    icon='assets/icon.png',
 )
