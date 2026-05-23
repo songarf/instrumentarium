@@ -12,6 +12,21 @@ on:
   workflow_dispatch:
 
 jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install pytest
+        run: pip install pytest
+
+      - name: Run tests
+        run: python -m pytest tests/ -v
+
   build-icons:
     runs-on: ubuntu-latest
     outputs:
@@ -42,7 +57,7 @@ jobs:
           retention-days: 1
 
   build:
-    needs: build-icons
+    needs: [test, build-icons]
     strategy:
       matrix:
         include:
@@ -89,8 +104,15 @@ jobs:
       - name: Build binary
         run: pyinstaller ${{ matrix.spec }} --distpath dist --workpath build
 
-      - name: Prepare archive
-        shell: ${{ matrix.os == 'windows-latest' && 'pwsh' || 'bash' }}
+      - name: Prepare archive (Windows)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        working-directory: dist
+        run: ${{ matrix.archive-cmd }}
+
+      - name: Prepare archive (Linux/macOS)
+        if: runner.os != 'Windows'
+        shell: bash
         working-directory: dist
         run: ${{ matrix.archive-cmd }}
 
