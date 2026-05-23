@@ -7,6 +7,14 @@ Checks dependencies, installs yt-dlp, starts the server, opens browser.
 import http.server, json, os, platform, shutil, ssl, subprocess, sys, threading, time, urllib.request, uuid, zipfile
 from urllib.parse import urlparse, parse_qs
 
+def _safe_print(*args, **kwargs):
+    """Print safely — skip when stdout is None (PyInstaller console=False on Windows)."""
+    if sys.stdout:
+        try:
+            print(*args, **kwargs)
+        except Exception:
+            pass
+
 # ── Config ──────────────────────────────────────────────────────────
 PORT = 18765
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
@@ -401,14 +409,14 @@ if __name__ == "__main__":
         t = threading.Thread(target=run_setup, daemon=True)
         t.start()
 
-    print(f"🎬 Video Downloader Server")
-    print(f"   URL: http://localhost:{PORT}")
-    print(f"   Output: {OUTPUT_BASE}/<platform>/")
-    print()
+    _safe_print(f"🎬 Video Downloader Server")
+    _safe_print(f"   URL: http://localhost:{PORT}")
+    _safe_print(f"   Output: {OUTPUT_BASE}/<platform>/")
+    _safe_print()
 
     srv = http.server.HTTPServer(("0.0.0.0", PORT), Handler)
     try:
         srv.serve_forever()
     except KeyboardInterrupt:
-        print("\nDone.")
+        _safe_print("\nDone.")
         srv.shutdown()
