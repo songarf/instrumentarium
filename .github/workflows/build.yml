@@ -29,9 +29,9 @@ jobs:
 
   build:
     needs: [test]
-    # Always run even if upstream jobs are skipped (never "skipped" itself)
-    if: always() && needs.test.result != 'failure'
+    if: needs.test.result == 'success'
     strategy:
+      fail-fast: false
       matrix:
         include:
           - os: ubuntu-latest
@@ -59,13 +59,6 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: '3.12'
-
-      - name: Build icons (SVG → .ico/.png)
-        run: |
-          if [ -f assets/icon.svg ]; then
-            pip install cairosvg Pillow
-            python assets/icon_build.py
-          fi
 
       - name: Install build deps
         run: |
