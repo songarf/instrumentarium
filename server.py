@@ -157,12 +157,12 @@ def install_python():
             "PrependPath=1",
             "Include_pip=1",
         ])
-        msg("✅ Python установлен! Перезапускаю…", "ok")
-        setup_state["progress"] = 70
-
-        # Re-launch ourselves
-        time.sleep(2)
-        os.execv(sys.executable, [sys.executable] + sys.argv)
+        msg("✅ Python установлен! Перезапусти приложение вручную.", "ok")
+        setup_state["progress"] = 100
+        setup_state["phase"] = "done"
+        setup_state["python_ok"] = True
+        setup_state["server_started"] = True
+        # Do NOT os.execv — let the user relaunch manually
 
     except Exception as e:
         msg(f"❌ Ошибка установки Python: {e}", "err")
