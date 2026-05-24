@@ -67,11 +67,10 @@ instrumentarium/
 ```
 <папка с .exe>/
 ├── instrumentarium.log         # Лог приложения (debug level)
-├── .setup_done                 # Маркёр завершённой настройки (содержит timestamp)
+├── .setup_done                 # Маркёр завершённой настройки (timestamp)
 ├── .instrumentarium.lock       # Lock-файл для единственного инстанса
 ├── .bin/                       # Скачанные бинарники
-│   ├── yt-dlp.exe              # (Windows) или yt-dlp (Linux/macOS)
-│   └── ffmpeg.exe              # (опционально, если найден/скачан)
+│   └── yt-dlp.exe              # (Windows) или yt-dlp (Linux/macOS)
 └── downloads/                  # Скачанные видео
     ├── youtube/
     ├── twitter/
@@ -113,7 +112,7 @@ app.py (main thread)
   │       ├── Проверка .setup_done:
   │       │   Есть → phase="silent_check", _ensure_deps() в фоне
   │       │   Нет  → run_setup() в фоне (показать wizard)
-  │       └── HTTP server на 0.0.0.0:18765
+  │       └── HTTP server на 0.0.0.0:18765 (timeout=0.5s)
   │
   ├── 6. Ожидание готовности сервера (max 5s, polling 127.0.0.1:18765)
   │
@@ -121,7 +120,7 @@ app.py (main thread)
           Windows: edgechromium → cef → auto-detect
           Linux:   auto-detect (GTK/Qt)
           macOS:   auto-detect (Cocoa)
-          При закрытии окна → srv.shutdown()
+          При закрытии → HTTP POST /shutdown → kill subprocess → stop server
 ```
 
 ### 3.2. Backend: server.py
@@ -144,12 +143,17 @@ server.py (импортируется как модуль из app.py)
   │     messages: [{text, type, time}]
   │     python_ok, ytdlp_ok, server_started, error
   │
+  ├── _active_proc = [None] — текущий запущенный yt-dlp subprocess
+  │     (list-based mutable global, для kill при shutdown)
+  │
   ├── HTTP Handler:
-  │     GET  /           → download.html
-  │     GET  /status     → JSON setup_state
+  │     GET  /              → download.html
+  │     GET  /status        → JSON setup_state
   │     GET  /log?job=&offset= → JSON {lines, status}
-  │     POST /setup      → запустить setup wizard
-  │     POST /download   → запустить скачивание
+  │     GET  /open-folder   → открыть папку downloads в файловом менеджере
+  │     POST /setup         → запустить setup wizard
+  │     POST /download      → запустить скачивание
+  │     POST /shutdown      → kill subprocess + stop server
   │
   ├── Setup flow:
   │     run_setup() — полный wizard (первый запуск):
@@ -164,12 +168,14 @@ server.py (импортируется как модуль из app.py)
   │       4. phase = "done"
   │
   └── Download:
-        JobLogger (thread):
+        JobLogger (daemon thread):
           1. Найти yt-dlp в _BIN_CANDIDATES
-          2. Найти ffmpeg
+          2. Найти ffmpeg (_find_ffmpeg)
           3. Сформировать cmd с форматами
-          4. _popen(cmd) → парсить stdout
-          5. Обновлять download_jobs[jid]
+          4. _popen(cmd) → _active_proc[0] = proc
+          5. proc.communicate(timeout=600) — ждать завершения
+          6. Парсить stdout → download_jobs[jid]
+          7. finally: _active_proc[0] = None
 ```
 
 ### 3.3. UI: download.html
@@ -178,26 +184,39 @@ server.py (импортируется как модуль из app.py)
 
 **Setup screen** (показывается при первом запуске):
 - Кнопка "🚀 Настроить и запустить"
-- Прогресс-бар с процентами и статусом
+- Прогресс-бар с shimmer-анимацией
 - После завершения → переключение на Download screen
 
 **Download screen** (показывается всегда после настройки):
-- Поле ввода URL
-- Бейдж платформы (определяется по URL)
-- Переключатель Видео/Аудио
+- Заголовок "🎬 Video Downloader"
+- Поле ввода URL с auto-detect платформы
+- Бейдж платформы (🔴 YouTube, 🐦 Twitter/X, 🎵 TikTok, 📸 Instagram, 📘 Facebook, 💼 LinkedIn, 🌐 Другое)
+- Переключатель 🎥 Видео (MP4) / 🎵 Аудио (MP3)
 - Кнопка "⬇️ Скачать"
-- Прогресс-бар скачивания
-- Toast для ошибок
+- Прогресс-бар: shimmer во время загрузки, зелёный `.done` при завершении
+- Toast для ошибок (❌ + описание + hint)
+- Кнопка "📁 Загрузки" (правый верхний угол) → `GET /open-folder`
 
 **Bootstrap-логика (выполняется при загрузке HTML):**
 ```javascript
 fetch('/status').then(d => {
   if (d.setup_done || d.phase === 'silent_check' || d.phase === 'checking') {
-    // Уже настроено — показать download screen сразу
     showDownloadScreen();
   }
   // Иначе показать setup screen (первый запуск)
 });
+```
+
+**CSS класс `.done` для progress-bar:**
+```css
+.progress-bar {
+  animation: shimmer 1.5s linear infinite;
+  background: linear-gradient(90deg, #6c5ce7, #a78bfa, #6c5ce7);
+}
+.progress-bar.done {
+  animation: none;
+  background: #4caf50;
+}
 ```
 
 ---
@@ -209,20 +228,21 @@ Main Thread (app.py)
   └── pywebview event loop (блокирует main thread)
 
 Server Thread (daemon, app.py → _start_server_in_thread)
-  └── http.server.HTTPServer.serve_forever()
+  └── http.server.HTTPServer.serve_forever(timeout=0.5)
         └── Handler.do_GET/do_POST (вызывается из HTTP-потока сервера)
 
 Setup Thread (daemon, server.py → run_setup или _ensure_deps)
   └── Проверка/установка Python, yt-dlp
 
 Download Thread (daemon, server.py → JobLogger)
-  └── subprocess.Popen(yt-dlp) → парсинг stdout
+  └── subprocess.Popen(yt-dlp) → proc.communicate() → parse stdout
 ```
 
 **Важно:**
 - Server thread — daemon, при завершении main thread убивается
-- При закрытии окна pywebview → `_on_closing()` → `srv.shutdown()` → сервер останавливается
+- При закрытии окна pywebview → `_on_closing()` → HTTP POST /shutdown → kill subprocess → server.stop
 - `os.chdir(_BASE_DIR)` выполняется в server thread — это меняет CWD для всего процесса
+- `_active_proc = [None]` — list-based mutable global для отслеживания активного subprocess
 
 ---
 
@@ -253,6 +273,12 @@ Download Thread (daemon, server.py → JobLogger)
 }
 ```
 
+### GET /open-folder
+Открывает папку downloads в файловом менеджере:
+- Windows: `explorer <path>`
+- macOS: `open <path>`
+- Linux: `xdg-open <path>`
+
 ### POST /setup
 Запускает setup wizard. Если уже настроено — возвращает `{"already_done": true}`.
 
@@ -270,6 +296,10 @@ Download Thread (daemon, server.py → JobLogger)
 // Response (error):
 {"error": "..."}
 ```
+
+### POST /shutdown
+Убивает активный yt-dlp subprocess (если есть), останавливает HTTP сервер.
+Вызывается из app.py при закрытии окна.
 
 ---
 
@@ -323,19 +353,13 @@ Download Thread (daemon, server.py → JobLogger)
 
 ### 7.2. Ключевые правила для PyInstaller one-file
 
-1. **`sys._MEIPASS`** — путь к временной папке, куда PyInstaller извлекает файлы. Используется для поиска `download.html` и `.bin/`.
-
-2. **`sys.executable`** — путь к .exe (не к скрипту!). Используется для `_BASE_DIR`.
-
-3. **Никогда** не использовать `subprocess.Popen([sys.executable, ...])` — это запустит ещё один .exe, который запустит ещё один → fork bomb.
-
-4. **Сервер запускается in-process** через `import server` + `threading.Thread`, а не через subprocess.
-
-5. **`os.chdir(_BASE_DIR)`** — критически важна, иначе относительные пути укажут не туда.
-
-6. **`CREATE_NO_WINDOW`** для всех subprocess calls на Windows.
-
-7. **`sys.stdout = sys.stderr = open(os.devnull, 'w')`** — до любого импорта, чтобы предотвратить создание консоли.
+1. **`sys._MEIPASS`** — путь к временной папке, куда PyInstaller извлекает файлы
+2. **`sys.executable`** — путь к .exe → `_BASE_DIR = dirname(sys.executable)`
+3. **НИКОГДА** не использовать `subprocess.Popen([sys.executable, ...])` — fork bomb!
+4. **Сервер запускается in-process** через `import server` + `threading.Thread`
+5. **`os.chdir(_BASE_DIR)`** — критически важна
+6. **`CREATE_NO_WINDOW`** для всех subprocess calls на Windows
+7. **`sys.stdout = sys.stderr = open(os.devnull, 'w')`** — до любого импорта
 
 ### 7.3. Команды сборки
 
@@ -346,8 +370,6 @@ pyinstaller video-downloader-win.spec --clean
 # Linux / macOS
 pyinstaller video-downloader.spec --clean
 ```
-
-Результат: `dist/Instrumentarium` (или `dist/Instrumentarium.exe`)
 
 ---
 
@@ -407,18 +429,21 @@ python -m pytest tests/ -v
 
 ### ✅ Решено
 - Нативное окно приложения (pywebview + CEF fallback)
-- Мерцание setup wizard при повторном запуске
-- Логирование в файл
-- Скачивание при повторном запуске (ожидание deps)
-- Все файлы в одной папке
-- Single instance lock
-- Автоматическая установка yt-dlp
-- Автоматическая установка Python (Windows)
+- Портативность: всё в одной папке с .exe
+- Setup wizard не появляется при повторном запуске
+- Закрытие без зависания (daemon thread + /shutdown endpoint)
+- Zombie process: /shutdown убивает активный yt-dlp subprocess
+- Glow animation: progress-bar получает класс .done при завершении
+- Кнопка 📁 Загрузки открывает папку с файловым менеджере
+- FFmpeg detection: metadata embedding только когда ffmpeg есть
+- Нет консольных окон на Windows
 - CI/CD для всех трёх платформ
+- 22 теста, все проходят
+- Single instance lock
+- Автоматическая установка yt-dlp и Python
 
 ### ⬜ Планы
 - Расширить тесты: HTTP-эндпоинты, setup wizard, JobLogger
-- Полный перевод UI на русский
 - Tauri-рефакторинг (долгосрочно)
 
 ---
@@ -436,6 +461,23 @@ python -m pytest tests/ -v
   → Все относительные пути теперь указывают на папку с .exe
 ```
 
+### Активный subprocess tracking
+```python
+_active_proc = [None]  # list-based mutable global
+
+# В JobLogger.run():
+_active_proc[0] = proc        # при запуске yt-dlp
+# ... proc.communicate() ...
+_active_proc[0] = None        # в finally блоке
+
+# В Handler.do_POST /shutdown:
+proc = _active_proc[0]
+if proc and proc.poll() is None:
+    proc.kill()
+    proc.wait(timeout=5)
+_active_proc[0] = None
+```
+
 ### Форматы видео/аудио
 ```
 Видео (с ffmpeg):  bestvideo[ext=mp4]+bestaudio[ext=m4a] → merge → mp4
@@ -444,8 +486,8 @@ python -m pytest tests/ -v
 ```
 
 ### Метаданные
-- `--embed-metadata` — встраивает метаданные в файл
-- `--embed-thumbnail` — встраивает превью
+- `--embed-metadata` — встраивает метаданные в файл (ТОЛЬКО если ffmpeg есть)
+- `--embed-thumbnail` — встраивает превью (ТОЛЬКО если ffmpeg есть)
 
 ### Платформа определяется по URL
 ```
@@ -460,4 +502,4 @@ linkedin.com              → linkedin
 
 ---
 
-*Последнее обновление: 2026-05-28*
+*Последнее обновление: 2026-05-29*
