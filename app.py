@@ -170,7 +170,19 @@ log.info("Starting webview main loop")
 # Prefer Edge WebView2 on Windows; fall back to default if unavailable
 try:
     webview.start(gui="edgechromium")
-except Exception:
-    log.warning("edgechromium not available, trying default")
-    webview.start()
-log.info("webview exited — shutting down")
+    log.info("webview exited normally")
+except Exception as e:
+    log.warning("edgechromium failed: %s, trying default", e)
+    try:
+        webview.start()
+        log.info("webview exited normally (default)")
+    except Exception as e2:
+        log.warning("webview failed: %s, opening in browser", e2)
+        import webbrowser
+        webbrowser.open("http://localhost:18765")
+        # Keep the process alive so the server keeps running
+        try:
+            while True:
+                time.sleep(1)
+        except KeyboardInterrupt:
+            pass
