@@ -182,23 +182,25 @@ try:
             for t in threading.enumerate():
                 log.info("  thread: %s (daemon=%s)", t.name, t.daemon)
             try:
-                import server as srv
-                log.info("server.srv exists: %s", hasattr(srv, "srv") and srv.srv is not None)
-                if hasattr(srv, "srv") and srv.srv:
-                    log.info("Scheduling srv.srv.shutdown() in background...")
-                    # Run shutdown in a daemon thread so we don't block the UI thread.
-                    # The server thread has a 0.5s accept timeout, so it will exit quickly.
-                    _t = threading.Thread(target=lambda: (
-                        log.info("shutdown thread: calling srv.srv.shutdown()..."),
-                        srv.srv.shutdown(),
-                        log.info("shutdown thread: srv.srv.shutdown() done")
-                    ), daemon=True)
-                    _t.start()
-                    log.info("shutdown thread started, returning to UI")
-                else:
-                    log.warning("server.srv not available — cannot shutdown gracefully")
+                import urllib.request as _ur
+                # Tell server to kill active subprocesses and shut down
+                log.info("Sending /shutdown to server...")
+                _ur.urlopen("http://127.0.0.1:18765/shutdown", timeout=5)
+                log.info("/shutdown sent successfully")
             except Exception as e:
-                log.error("Error during window closing: %s", e, exc_info=True)
+                log.warning("Could not send /shutdown: %s", e, exc_info=True)
+                # Fallback: try direct server shutdown
+                try:
+                    import server as srv
+                    if hasattr(srv, "srv") and srv.srv:
+                        _t = threading.Thread(target=lambda: (
+                            log.info("fallback: calling srv.srv.shutdown()..."),
+                            srv.srv.shutdown(),
+                            log.info("fallback: srv.srv.shutdown() done")
+                        ), daemon=True)
+                        _t.start()
+                except Exception as e2:
+                    log.error("Fallback shutdown also failed: %s", e2)
             log.info("_on_closing complete")
 
         window.events.closing += _on_closing

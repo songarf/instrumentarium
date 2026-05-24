@@ -438,6 +438,19 @@ class Handler(http.server.BaseHTTPRequestHandler):
             _serve_html_file(self)
             return
 
+        if p.path == "/open-folder":
+            import subprocess as _sp, subprocess
+            folder = os.path.abspath(OUTPUT_BASE)
+            log.info("/open-folder: %s", folder)
+            if platform.system() == "Windows":
+                _sp.Popen(["explorer", folder], creationflags=subprocess.CREATE_NO_WINDOW)
+            elif platform.system() == "Darwin":
+                _sp.Popen(["open", folder])
+            else:
+                _sp.Popen(["xdg-open", folder])
+            self._json({"ok": True})
+            return
+
         if p.path == "/status":
             # On first contact, check if setup was already done
             if setup_state["phase"] == "idle" and os.path.exists(SETUP_MARKER):
@@ -529,6 +542,23 @@ class Handler(http.server.BaseHTTPRequestHandler):
             self._json({"job_id": jid, "platform": detect_platform(url)})
             return
 
+        if self.path == "/shutdown":
+            log.info("/shutdown received — killing active subprocesses and stopping server")
+            proc = _active_proc[0]
+            if proc and proc.poll() is None:
+                log.info("/shutdown: killing active yt-dlp pid=%d", proc.pid)
+                proc.kill()
+                try:
+                    proc.wait(timeout=5)
+                except Exception:
+                    pass
+            _active_proc[0] = None
+            # Schedule server shutdown in a background thread (can't block this one)
+            import threading as _th
+            _th.Thread(target=lambda: (time.sleep(0.2), srv.shutdown()), daemon=True).start()
+            self._json({"ok": True})
+            return
+
         self.send_error(404)
 
     def log_message(self, format, *args):
@@ -587,6 +617,7 @@ def _serve_html_file(handler):
 
 # ── Download job logger ─────────────────────────────────────────────
 download_jobs = {}
+_active_proc = [None]  # Currently running yt-dlp subprocess (list for mutability without global)
 
 def detect_platform(url):
     u = url.lower()
@@ -657,6 +688,7 @@ class JobLogger(threading.Thread):
         try:
             log.info("JobLogger[%s]: calling _popen...", self.job_id)
             proc = _popen(cmd)
+            _active_proc[0] = proc
             log.info("JobLogger[%s]: popen returned, pid=%s", self.job_id, proc.pid)
             # Wait for process to complete and read all output at once
             stdout_data, _ = proc.communicate(timeout=600)
@@ -705,6 +737,9 @@ class JobLogger(threading.Thread):
             j["status"] = "error"
             j["log"].append(f"[error] {e}")
             log.error("JobLogger[%s]: exception: %s", self.job_id, e, exc_info=True)
+        finally:
+            if _active_proc[0] is proc:
+                _active_proc[0] = None
 
 def _human(n):
     for u in ['B','KB','MB','GB']:

@@ -70,6 +70,10 @@
     transition: width .5s ease;
     animation: shimmer 1.5s linear infinite;
   }
+  .progress-bar.done {
+    animation: none;
+    background: #4caf50;
+  }
   @keyframes shimmer {
     0% { background-position: 200% 0; }
     100% { background-position: -200% 0; }
@@ -185,8 +189,13 @@
   <!-- DOWNLOAD SCREEN                                        -->
   <!-- ═══════════════════════════════════════════════════════ -->
   <div class="download-screen" id="downloadScreen">
-    <h1>🎬 Video Downloader</h1>
-    <p class="subtitle">Скачай видео с YouTube, Twitter/X, TikTok, Instagram, Facebook, LinkedIn и 1000+ сайтов</p>
+    <div style="display:flex; justify-content:space-between; align-items:flex-start;">
+      <div>
+        <h1>🎬 Video Downloader</h1>
+        <p class="subtitle">Скачай видео с YouTube, Twitter/X, TikTok, Instagram, Facebook, LinkedIn и 1000+ сайтов</p>
+      </div>
+      <button onclick="openFolder()" style="background:none; border:1px solid #2a2a4a; border-radius:8px; padding:6px 10px; color:#888; cursor:pointer; font-size:.75rem; transition:all .2s; margin-left:12px; flex-shrink:0;" title="Открыть папку загрузок">📁 Загрузки</button>
+    </div>
 
     <label>Ссылка на видео</label>
     <input type="url" id="url" placeholder="https://youtube.com/watch?v=…" autocomplete="off" autofocus>
@@ -340,6 +349,10 @@ function pollSetup() {
   }).catch(() => {});
 }
 
+function openFolder() {
+  fetch('/open-folder', { method: 'GET' }).catch(() => {});
+}
+
 /* ── Download ─────────────────────────────────────────────── */
 let dlPoll = null;
 
@@ -360,7 +373,9 @@ function download() {
   document.getElementById('dlProgress').style.display = 'block';
   document.getElementById('dlProgress').classList.add('fade-in');
   hideError();
-  document.getElementById('dlBar').style.width = '5%';
+  const dlBar = document.getElementById('dlBar');
+  dlBar.style.width = '5%';
+  dlBar.classList.remove('done');
   document.getElementById('dlStatus').textContent = 'Запуск…';
 
   const btn = document.getElementById('dlBtn');
@@ -410,6 +425,7 @@ function download() {
           if (d.status === 'done' || d.status === 'error') {
             clearInterval(dlPoll);
             document.getElementById('dlBar').style.width = '100%';
+            document.getElementById('dlBar').classList.add('done');
             if (d.status === 'done') {
               document.getElementById('dlStatus').textContent = '✅ Готово!';
             }
