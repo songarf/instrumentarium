@@ -21,30 +21,34 @@ def _safe_print(*args, **kwargs):
 # ── Config ──────────────────────────────────────────────────────────
 PORT = 18765
 
-# When running from PyInstaller bundle, SCRIPT_DIR points to the temp
-# extraction folder (_MEIxxxxx/) which is recreated on every launch.
-# For persistent state (setup marker, downloads) we use the folder
-# where the .exe/.py lives — sys._MEIPASS is temp, sys.executable is real.
+# When running from PyInstaller bundle, __file__ points to temp _MEI dir.
+# For persistent state we use the exe location. For bundled read-only data
+# (download.html, icons) we look in _MEIPASS first, then beside exe.
 if hasattr(sys, "_MEIPASS"):
-    # PyInstaller bundle — persistent data goes next to the exe
     _EXE_DIR = os.path.dirname(os.path.abspath(sys.executable))
     SCRIPT_DIR = _EXE_DIR
+    _DATA_DIRS = [sys._MEIPASS, _EXE_DIR]
 else:
     SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
+    _DATA_DIRS = [SCRIPT_DIR]
 
-# But yt-dlp binary lives in _MEIPASS/.bin during PyInstaller runs
+_OUTPUT_BASE = os.path.join(SCRIPT_DIR, "downloads")
+_SETUP_MARKER = os.path.join(SCRIPT_DIR, ".setup_done")
+_LOCK_PATH = os.path.join(SCRIPT_DIR, ".instrumentarium.lock")
+
+# yt-dlp binary locations (beside exe first, then bundle)
 if hasattr(sys, "_MEIPASS"):
     _BIN_CANDIDATES = [
-        os.path.join(os.path.dirname(os.path.abspath(sys.executable)), ".bin"),  # beside exe
-        os.path.join(sys._MEIPASS, ".bin"),  # inside bundle
+        os.path.join(_EXE_DIR, ".bin"),
+        os.path.join(sys._MEIPASS, ".bin"),
     ]
 else:
     _BIN_CANDIDATES = [os.path.join(SCRIPT_DIR, ".bin")]
 
-OUTPUT_BASE = os.path.join(SCRIPT_DIR, "downloads")
-YT_DLP_DIR = _BIN_CANDIDATES[0]  # primary: beside exe (persists across launches)
+OUTPUT_BASE = _OUTPUT_BASE
+YT_DLP_DIR = _BIN_CANDIDATES[0]
+SETUP_MARKER = _SETUP_MARKER
 YT_DLP = os.path.join(YT_DLP_DIR, "yt-dlp.exe" if platform.system() == "Windows" else "yt-dlp")
-SETUP_MARKER = os.path.join(SCRIPT_DIR, ".setup_done")
 
 # ── Subprocess helper — no console windows on Windows ───────────────
 def _popen(cmd, **kwargs):
@@ -237,12 +241,12 @@ def _find_ffmpeg():
         names = ["ffmpeg.exe", "ffmpeg"]
     else:
         names = ["ffmpeg"]
-    # Check beside exe first
-    exe_dir = os.path.dirname(os.path.abspath(sys.executable)) if hasattr(sys, "_MEIPASS") else SCRIPT_DIR
-    for name in names:
-        candidate = os.path.join(exe_dir, ".bin", name)
-        if os.path.isfile(candidate):
-            return candidate
+    # Check all bin candidates
+    for d in _BIN_CANDIDATES:
+        for name in names:
+            candidate = os.path.join(d, name)
+            if os.path.isfile(candidate):
+                return candidate
     # Check system PATH
     return shutil.which("ffmpeg") or shutil.which("ffmpeg.exe")
 
@@ -440,7 +444,14 @@ class Handler(http.server.BaseHTTPRequestHandler):
         self.wfile.write(body)
 
     def _serve_html(self):
-        html_path = os.path.join(SCRIPT_DIR, "download.html")
+        html_path = None
+        for d in _DATA_DIRS:
+            candidate = os.path.join(d, "download.html")
+            if os.path.isfile(candidate):
+                html_path = candidate
+                break
+        if not html_path:
+            html_path = os.path.join(SCRIPT_DIR, "download.html")  # fallback for error message
         try:
             with open(html_path, "rb") as f:
                 body = f.read()
