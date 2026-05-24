@@ -1,86 +1,193 @@
-# 🎬 Instrumentarium — Build Instructions
+# INSTRUMENTARIUM — Build Instructions
 
-## Project Structure
+*Как собрать Instrumentarium на разных платформах.*
 
-```
-Instrumentarium/
-├── app.py                      # Desktop launcher (pywebview → native window 620×700)
-├── server.py                   # Backend: setup wizard + HTTP server (port 18765) + yt-dlp
-├── download.html               # UI: setup wizard + downloader (dark theme)
-├── start.sh / start.bat        # Quick launch scripts (no build needed)
-├── assets/
-│   ├── icon.svg                # Source icon
-│   ├── icon.png                # Generated icon (512×512, in git)
-│   ├── icon.ico                # Generated icon (256×256, in git)
-│   └── icon_build.py           # SVG → .ico/.png converter (utility, not needed in CI)
-├── tests/
-│   └── test_server.py          # 22 tests (pytest)
-├── video-downloader.spec       # PyInstaller spec (Linux/macOS)
-├── video-downloader-win.spec   # PyInstaller spec (Windows)
-├── pytest.ini                  # Pytest config
-├── .github/workflows/build.yml # CI/CD
-└── downloads/                  # Output folder (organized by platform)
-```
+---
 
-## Prerequisites (all platforms)
+## Содержание
 
-- Python 3.7+
-- pip
+1. [Быстрый запуск (без сборки)](#быстрый-запуск)
+2. [Локальная сборка](#локальная-сборка)
+3. [CI/CD](#cicd)
+4. [Структура артефактов](#структура-артефактов)
+5. [Устранение неполадок](#устранение-неполадок)
 
-## Quick Launch (no build)
+---
 
-### Linux / macOS / WSL
+## Быстрый запуск
+
+Для разработки и тестирования без сборки:
+
 ```bash
+# Linux / macOS / WSL
 bash start.sh
-```
 
-### Windows
-```
+# Windows
 start.bat
 ```
 
----
-
-## Building Portable Binaries
-
-### 🐧 Linux Binary
-
-```bash
-pip install pyinstaller pywebview
-pyinstaller video-downloader.spec
-# Output: dist/Instrumentarium (standalone binary)
-```
-
-### 🪟 Windows .exe
-
-```powershell
-pip install pyinstaller pywebview
-pyinstaller video-downloader-win.spec
-# Output: dist/Instrumentarium.exe
-```
-
-### 🍎 macOS Binary
-
-```bash
-pip3 install pyinstaller pywebview
-pyinstaller video-downloader.spec
-# Output: dist/Instrumentarium
-```
+Требования: Python 3.7+, pip
 
 ---
 
-## GitHub Actions (Automated Cross-Platform Builds)
+## Локальная сборка
 
-CI runs automatically on push to `main` or tag `v*`.
+### Требования
 
-**Pipeline:**
-1. **test** (ubuntu) — `python -m pytest tests/ -v`
-2. **build** (matrix: linux/windows/macos, fail-fast: false) — PyInstaller → portable archive
-3. **release** (tag v* only) — GitHub Release with all archives
+- Python 3.12
+- pip
+- PyInstaller (`pip install pyinstaller`)
 
-**Artifacts (portable, no installers):**
-- `Instrumentarium-linux.tar.gz`
-- `Instrumentarium-windows.zip`
-- `Instrumentarium-macos.tar.gz`
+### Linux
 
-Icons are pre-generated in git (`assets/icon.png`, `assets/icon.ico`) — no build step needed in CI.
+```bash
+pip install pyinstaller
+pyinstaller video-downloader.spec --clean
+# Результат: dist/Instrumentarium
+```
+
+### Windows
+
+```cmd
+pip install pyinstaller
+pyinstaller video-downloader-win.spec --clean
+# Результат: dist/Instrumentarium.exe
+```
+
+### macOS
+
+```bash
+pip install pyinstaller
+pyinstaller video-downloader.spec --clean
+# Результат: dist/Instrumentarium
+```
+
+### Флаги PyInstaller
+
+| Флаг | Назначение |
+|------|-----------|
+| `--onefile` | Всё в один исполняемый файл |
+| `--console` / `--noconsole` | Показывать/скрыть консоль (Windows) |
+| `--clean` | Очистить кеш PyInstaller перед сборкой |
+| `--distpath` | Куда положить результат |
+| `--workpath` | Куда положить временные файлы |
+
+---
+
+## CI/CD
+
+GitHub Actions автоматически собирает при каждом push в `main`.
+
+### Триггеры
+
+- `push` в ветку `main`
+- Тег `v*` (например, `v1.0.0`)
+- Ручной запуск (`workflow_dispatch`)
+
+### Пайплайн
+
+```
+test (ubuntu)
+  ↓ pytest 22 tests
+build (matrix)
+  ↓ linux  → tar gz (Instrumentarium + download.html)
+  ↓ windows → zip (Instrumentarium.exe + download.html)
+  ↓ macOS   → tar gz (Instrumentarium + download.html)
+release (только при теге v*)
+  → GitHub Release с тремя архивами
+```
+
+### CI особенности
+
+- `--clean` флаг обходит кеширование PyInstaller (issue #7653)
+- Очистка `bincache` перед каждым билдом
+- Архивируются ВСЕ файлы из `dist/` (wildcard `*`)
+
+---
+
+## Структура артефактов
+
+Каждый архив содержит бинарь + UI-файл:
+
+```
+Instrumentarium-linux.tar.gz
+  └── Instrumentarium      # исполняемый файл
+  └── download.html        # UI
+
+Instrumentarium-windows.zip
+  └── Instrumentarium.exe  # исполняемый файл
+  └── download.html        # UI
+
+Instrumentarium-macos.tar.gz
+  └── Instrumentarium      # исполняемый файл
+  └── download.html        # UI
+```
+
+### Важно: download.html
+
+`download.html` — это UI приложения. Он должен лежать **рядом** с бинарником. При запуске сервер ищет его в:
+1. Папке с бинарником
+2. PyInstaller `_MEIPASS` (временная папка one-file mode)
+3. Папке `server.py` (dev mode)
+
+---
+
+## Тестирование билда
+
+### Чеклист после сборки
+
+- [ ] При первом запуске показывается setup wizard
+- [ ] Setup wizard проверяет/скачивает зависимости
+- [ ] После setup появляется экран загрузки
+- [ ] При повторном запуске setup НЕ показывается
+- [ ] Вставка ссылки → определяется платформа
+- [ ] Скачивание видео работает
+- [ ] Нет консольных окон (Windows)
+
+### Логи
+
+Логи пишутся в:
+```
+Windows: %LOCALAPPDATA%\Instrumentarium\instrumentarium.log
+Linux:   ~/.instrumentarium/instrumentarium.log
+```
+
+---
+
+## Устранение неполадок
+
+### "UI file not found"
+
+`download.html` не найден. Убедитесь что он лежит рядом с .exe.
+
+### "ERR_EMPTY_RESPONSE" / страница не открывается
+
+Сервер не запустился. Проверьте `instrumentarium.log`.
+
+### "Another instance is already running"
+
+Предыдущий инстанс не закрылся. Удалите lock-файл:
+```
+Windows: %LOCALAPPDATA%\Instrumentarium\.instrumentarium.lock
+Linux:   ~/.instrumentarium/.instrumentarium.lock
+```
+
+### Setup wizard показывается каждый раз
+
+Удалите маркёр для сброса:
+```
+Windows: %LOCALAPPDATA%\Instrumentarium\.setup_done
+Linux:   ~/.instrumentarium/.setup_done
+```
+
+### Console flash на Windows
+
+Убедитесь что используется `--noconsole` и `CREATE_NO_WINDOW` для всех subprocess.
+
+### Низкое качество видео
+
+FFmpeg не найден. Скачайте ffmpeg и положите в `.bin/` рядом с бинарником.
+
+---
+
+*Последнее обновление: 2026-05-28*
