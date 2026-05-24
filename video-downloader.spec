@@ -4,12 +4,10 @@
 block_cipher = None
 
 a = Analysis(
-    ['app.py'],
+    ['app.py', 'server.py'],
     pathex=[],
     binaries=[],
-    datas=[
-        ('server.py', '.'),
-    ],
+    datas=[],
     hiddenimports=['bottle', 'proxy_tools'],
     hookspath=[],
     hooksconfig={},
