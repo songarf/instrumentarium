@@ -7,19 +7,25 @@ Opens a native window with the HTML UI and runs the backend server.
 import os, sys, threading, signal, atexit, logging, time
 
 # ── Logging setup ──────────────────────────────────────────────────
-SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
-LOG_PATH = os.path.join(SCRIPT_DIR, "instrumentarium.log")
+# When running from PyInstaller bundle, __file__ points to temp _MEI dir.
+# Use sys.executable location for persistent log file.
+if hasattr(sys, "_MEIPASS"):
+    _BASE_DIR = os.path.dirname(os.path.abspath(sys.executable))
+else:
+    _BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+
+LOG_PATH = os.path.join(_BASE_DIR, "instrumentarium.log")
 
 # Logging can be disabled with INSTRUMENTARIUM_LOG=0
 _LOGGING_ENABLED = os.environ.get("INSTRUMENTARIUM_LOG", "1") != "0"
 
 if _LOGGING_ENABLED:
+    # File only — no StreamHandler to avoid creating a console window
     logging.basicConfig(
         level=logging.DEBUG,
         format="%(asctime)s [%(levelname)s] %(message)s",
         handlers=[
             logging.FileHandler(LOG_PATH, encoding="utf-8"),
-            logging.StreamHandler(sys.stderr) if sys.stderr else logging.NullHandler(),
         ],
     )
 else:
@@ -27,14 +33,14 @@ else:
 
 log = logging.getLogger("instrumentarium")
 log.info("=== Instrumentarium starting ===")
-log.info("SCRIPT_DIR: %s", SCRIPT_DIR)
+log.info("BASE_DIR: %s", _BASE_DIR)
 log.info("sys.executable: %s", sys.executable)
 log.info("sys.platform: %s", sys.platform)
 if hasattr(sys, "_MEIPASS"):
     log.info("PyInstaller bundle: %s", sys._MEIPASS)
 
 # ── Single instance lock ───────────────────────────────────────────
-_LOCK_PATH = os.path.join(SCRIPT_DIR, ".instrumentarium.lock")
+_LOCK_PATH = os.path.join(_BASE_DIR, ".instrumentarium.lock")
 _lock_fd = None
 
 def _acquire_lock():
@@ -80,11 +86,11 @@ atexit.register(_cleanup_lock)
 # Using subprocess.Popen([sys.executable, 'server.py']) would launch another
 # copy of the .exe, which launches another, creating a fork bomb.
 
-SETUP_MARKER_PATH = os.path.join(SCRIPT_DIR, ".setup_done")
+SETUP_MARKER_PATH = os.path.join(_BASE_DIR, ".setup_done")
 
 def _start_server_in_thread():
     log.info("Starting server thread...")
-    os.chdir(SCRIPT_DIR)
+    os.chdir(_BASE_DIR)
     try:
         import server as srv
         log.info("Server module imported successfully")
