@@ -65,7 +65,10 @@ jobs:
           pip install pyinstaller
 
       - name: Build binary
-        run: pyinstaller ${{ matrix.spec }} --clean --distpath dist --workpath build
+        run: |
+          # Force clean PyInstaller cache (Windows/Linux)
+          python -c "import shutil, os, sys; cache = os.path.join(os.environ.get('LOCALAPPDATA' if sys.platform=='win32' else 'HOME', ''), 'pyinstaller', 'bincache'); shutil.rmtree(cache, errors='ignore') if os.path.isdir(cache) else None"
+          pyinstaller ${{ matrix.spec }} --clean --distpath dist --workpath build
 
       - name: Prepare archive (Windows)
         if: runner.os == 'Windows'
