@@ -7,7 +7,9 @@ a = Analysis(
     ['app.py', 'server.py'],
     pathex=[],
     binaries=[],
-    datas=[],
+    datas=[
+        ('download.html', '.'),
+    ],
     hiddenimports=['bottle', 'proxy_tools'],
     hookspath=[],
     hooksconfig={},
