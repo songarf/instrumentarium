@@ -10,7 +10,7 @@ a = Analysis(
     datas=[
         ('download.html', '.'),
     ],
-    hiddenimports=['bottle', 'proxy_tools'],
+    hiddenimports=['webview', 'pywebview.platforms.winforms'],
     hookspath=[],
     hooksconfig={},
     runtime_hooks=[],

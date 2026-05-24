@@ -153,14 +153,66 @@ for _ in range(50):
 else:
     log.warning("Server didn't start in time, proceeding anyway")
 
-# ── Open UI in browser ──────────────────────────────────────────────
-log.info("Opening browser...")
-import webbrowser
-webbrowser.open("http://localhost:18765")
-log.info("Browser opened — keeping server alive")
-# Keep the process alive so the server keeps running
+# ── Open UI in app window (pywebview) with browser fallback ──────────
+log.info("Opening window...")
 try:
-    while True:
-        time.sleep(1)
-except KeyboardInterrupt:
-    pass
+    import webview
+    
+    # Check if WebView2 Runtime is available on Windows
+    _webview2_available = False
+    if sys.platform == "win32":
+        try:
+            import winreg
+            # Check registry for WebView2 Evergreen Runtime
+            key_path = r"SOFTWARE\WOW6432Node\Microsoft\EdgeUpdate\Clients\{F3017226-FE2A-4295-8BDF-00C3A9A7E4C5}"
+            try:
+                key = winreg.OpenKey(winreg.HKEY_LOCAL_MACHINE, key_path)
+                val, _ = winreg.QueryValueEx(key, "pv")
+                winreg.CloseKey(key)
+                if val and val != "0.0.0.0":
+                    _webview2_available = True
+                    log.info("WebView2 Runtime found: %s", val)
+            except FileNotFoundError:
+                # Try 32-bit registry
+                try:
+                    key_path32 = r"SOFTWARE\Microsoft\EdgeUpdate\Clients\{F3017226-FE2A-4295-8BDF-00C3A9A7E4C5}"
+                    key = winreg.OpenKey(winreg.HKEY_LOCAL_MACHINE, key_path32)
+                    val, _ = winreg.QueryValueEx(key, "pv")
+                    winreg.CloseKey(key)
+                    if val and val != "0.0.0.0":
+                        _webview2_available = True
+                        log.info("WebView2 Runtime found: %s", val)
+                except FileNotFoundError:
+                    log.info("WebView2 Runtime not found in registry")
+        except Exception as e:
+            log.info("Could not check WebView2 registry: %s", e)
+    
+    if _webview2_available:
+        # Use native WebView2 window
+        log.info("Using WebView2 for native window")
+        webview.create_window(
+            "Instrumentarium",
+            url="http://localhost:18765",
+            width=620,
+            height=700,
+            resizable=True,
+            min_size=(540, 500),
+        )
+        webview.start(gui="edgechromium")
+    else:
+        # Fallback: open in default browser
+        log.info("WebView2 not available, falling back to system browser")
+        raise ImportError("WebView2 not available")
+        
+except Exception as e:
+    if "import" in str(e).lower() or "WebView2" in str(e):
+        log.info("pywebview/WebView2 not available, using webbrowser fallback: %s", e)
+    import webbrowser
+    webbrowser.open("http://localhost:18765")
+    log.info("Browser opened — keeping server alive")
+    # Keep the process alive so the server keeps running
+    try:
+        while True:
+            time.sleep(1)
+    except KeyboardInterrupt:
+        pass
