@@ -3,14 +3,21 @@
 
 block_cipher = None
 
+# Collect all pywebview submodules (needed for edgechromium on Windows)
+try:
+    from PyInstaller.utils.hooks import collect_all
+    webview_datas, webview_binaries, webview_hiddenimports = collect_all('webview')
+except Exception:
+    webview_datas, webview_binaries, webview_hiddenimports = [], [], ['webview']
+
 a = Analysis(
     ['app.py', 'server.py'],
     pathex=[],
-    binaries=[],
+    binaries=webview_binaries,
     datas=[
         ('download.html', '.'),
-    ],
-    hiddenimports=['webview', 'pywebview.platforms.winforms'],
+    ] + webview_datas,
+    hiddenimports=webview_hiddenimports,
     hookspath=[],
     hooksconfig={},
     runtime_hooks=[],
