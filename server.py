@@ -10,6 +10,35 @@ from urllib.parse import urlparse, parse_qs
 # ── Logging ──────────────────────────────────────────────────────────
 log = logging.getLogger("instrumentarium.server")
 
+def _wait_deps(handler, timeout=30):
+    """Wait for silent dep check to complete, then respond."""
+    import time as _t
+    _deadline = _t.time() + timeout
+    while _t.time() < _deadline:
+        if setup_state["phase"] == "done":
+            # Re-process the download request now that deps are ready
+            handler._json({"ok": True, "deps_ready": True})
+            return
+        if setup_state["phase"] == "error":
+            handler._json({"error": "Setup failed: " + str(setup_state.get("error", "unknown"))})
+            return
+        _t.sleep(0.5)
+    handler._json({"error": "Timeout waiting for dependencies"})
+
+def _ensure_log_handler():
+    """Make sure the server logger has at least one handler.
+    When run from app.py, basicConfig already set up a root FileHandler
+    that this logger inherits. When run standalone, add our own."""
+    if not log.handlers and not logging.getLogger().handlers:
+        _persist_dir = os.path.join(os.environ.get("LOCALAPPDATA", os.environ.get("HOME", "")), "Instrumentarium") if os.name == "nt" else os.path.join(os.environ.get("HOME", ""), ".instrumentarium")
+        os.makedirs(_persist_dir, exist_ok=True)
+        _log_path = os.path.join(_persist_dir, "instrumentarium.log")
+        _fh = logging.FileHandler(_log_path, encoding="utf-8")
+        _fh.setFormatter(logging.Formatter("%(asctime)s [%(levelname)s] %(message)s"))
+        log.addHandler(_fh)
+
+_ensure_log_handler()
+
 def _safe_print(*args, **kwargs):
     """Print safely — skip when stdout is None (PyInstaller console=False on Windows)."""
     if sys.stdout:
@@ -448,8 +477,15 @@ class Handler(http.server.BaseHTTPRequestHandler):
             return
 
         if self.path == "/download":
-            if setup_state["phase"] != "done":
+            if setup_state["phase"] == "error":
+                self._json({"error": "Setup failed: " + str(setup_state.get("error", "unknown"))})
+                return
+            if setup_state["phase"] not in ("done", "silent_check"):
                 self._json({"error": "Setup not complete"})
+                return
+            # Wait for silent dep check to finish if it's still running
+            if setup_state["phase"] == "silent_check":
+                _wait_deps(self)
                 return
             length = int(self.headers.get("Content-Length", 0))
             body = json.loads(self.rfile.read(length) or b"{}")

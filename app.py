@@ -29,23 +29,38 @@ else:
     _PERSIST_DIR = os.path.join(os.environ.get("HOME", ""), ".instrumentarium")
 os.makedirs(_PERSIST_DIR, exist_ok=True)
 
-# Log to persistent directory (survives reinstalls, always writable)
-LOG_PATH = os.path.join(_PERSIST_DIR, "instrumentarium.log")
+# Log to BOTH persistent dir and beside the exe so the user can always find it
+_LOG_HANDLERS = []
+# Persistent dir (survives reinstalls)
+if _PERSIST_DIR:
+    try:
+        _LOG_HANDLERS.append(logging.FileHandler(os.path.join(_PERSIST_DIR, "instrumentarium.log"), encoding="utf-8"))
+    except Exception:
+        pass
+# Beside the exe/bundle (user-visible)
+if _BASE_DIR:
+    try:
+        _LOG_HANDLERS.append(logging.FileHandler(os.path.join(_BASE_DIR, "instrumentarium.log"), encoding="utf-8"))
+    except Exception:
+        pass
+# Fallback: current directory
+if not _LOG_HANDLERS:
+    try:
+        _LOG_HANDLERS.append(logging.FileHandler("instrumentarium.log", encoding="utf-8"))
+    except Exception:
+        pass
 
 # Logging can be disabled with INSTRUMENTARIUM_LOG=0
 _LOGGING_ENABLED = os.environ.get("INSTRUMENTARIUM_LOG", "1") != "0"
 
-if _LOGGING_ENABLED:
-    # File only — no StreamHandler to avoid creating a console window
+if _LOGGING_ENABLED and _LOG_HANDLERS:
     logging.basicConfig(
         level=logging.DEBUG,
         format="%(asctime)s [%(levelname)s] %(message)s",
-        handlers=[
-            logging.FileHandler(LOG_PATH, encoding="utf-8"),
-        ],
+        handlers=_LOG_HANDLERS,
     )
-else:
-    logging.basicConfig(level=logging.CRITICAL + 1)  # effectively silent
+elif not _LOGGING_ENABLED:
+    logging.basicConfig(level=logging.CRITICAL + 1)
 
 log = logging.getLogger("instrumentarium")
 log.info("=== Instrumentarium starting ===")
@@ -127,7 +142,11 @@ def _start_server_in_thread():
         log.info("Setup marker exists: %s", marker_exists)
 
         if marker_exists:
-            # Already configured — just do a silent dep check, no UI needed
+            # Already configured — just do a silent dep check, no UI needed.
+            # Set phase IMMEDIATELY so /status returns silent_check right away,
+            # preventing the setup screen from flashing on repeated launches.
+            srv.setup_state["phase"] = "silent_check"
+            srv.setup_state["setup_done"] = True
             log.info("Previous setup found — running silent dep check...")
             t = threading.Thread(target=srv._ensure_deps, daemon=True)
             t.start()

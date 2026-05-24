@@ -378,6 +378,15 @@ function download() {
       btn.disabled = false; btn.textContent = '⬇️ Скачать';
       return;
     }
+    // Server is still checking deps — retry after a short delay
+    if (data.deps_ready) {
+      document.getElementById('dlStatus').textContent = '✅ Зависимости готовы, запуск…';
+      setTimeout(() => {
+        btn.disabled = false;
+        download();
+      }, 500);
+      return;
+    }
     document.getElementById('dlStatus').textContent = `📦 ${data.platform} — скачивание…`;
     let offset = 0;
     dlPoll = setInterval(() => {
