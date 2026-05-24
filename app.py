@@ -6,6 +6,13 @@ Opens a native window with the HTML UI and runs the backend server.
 
 import os, sys, threading, signal, atexit, logging, time
 
+# ── Detach from console on Windows (must be done before anything else) ──
+if sys.platform == "win32" and not sys.stdout:
+    # PyInstaller console=False sets stdout/stderr to None.
+    # Explicitly redirect to devnull to prevent any module from reopening stdout.
+    sys.stdout = open(os.devnull, "w")
+    sys.stderr = open(os.devnull, "w")
+
 # ── Logging setup ──────────────────────────────────────────────────
 # When running from PyInstaller bundle, __file__ points to temp _MEI dir.
 # Use sys.executable location for persistent log file.
