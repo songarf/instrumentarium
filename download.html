@@ -148,6 +148,18 @@
   .dl-progress { margin-top: 18px; }
   .dl-status { font-size: .82rem; color: #888; margin-top: 8px; }
 
+  .log-actions {
+    display: flex; justify-content: flex-end; margin-top: 6px;
+  }
+  .copy-btn {
+    background: #12122a; border: 1px solid #2a2a4a;
+    border-radius: 6px; padding: 4px 12px;
+    font-size: .72rem; color: #888; cursor: pointer;
+    transition: all .2s;
+  }
+  .copy-btn:hover { border-color: #6c5ce7; color: #a78bfa; }
+  .copy-btn.copied { border-color: #2ed573; color: #2ed573; }
+
   .footer {
     margin-top: 20px; font-size: .72rem; color: #444; text-align: center;
   }
@@ -210,6 +222,9 @@
       <div class="progress-bg"><div class="progress-bar" id="dlBar"></div></div>
       <div class="dl-status" id="dlStatus"></div>
       <div class="log-area" id="dlLog"></div>
+      <div class="log-actions">
+        <button class="copy-btn" id="copyBtn" onclick="copyLogs()">📋 Копировать логи</button>
+      </div>
     </div>
 
     <p class="footer">Готово к работе ✅</p>
@@ -256,6 +271,16 @@ function setMode(m) {
   document.getElementById('optAudio').classList.toggle('active', m === 'audio');
 }
 
+/* ── Bootstrap: check if setup already done ────────────────── */
+fetch('/status').then(r => r.json()).then(d => {
+  if (d.phase === 'done' && d.setup_done) {
+    // Already configured — skip setup, show download screen
+    document.getElementById('setupScreen').style.display = 'none';
+    document.getElementById('downloadScreen').style.display = 'block';
+    document.getElementById('downloadScreen').classList.add('fade-in');
+  }
+}).catch(() => {});
+
 /* ── Setup wizard ─────────────────────────────────────────── */
 let setupPoll = null;
 
@@ -269,7 +294,15 @@ function startSetup() {
   document.getElementById('setupLog').classList.add('visible');
 
   // Start setup on server
-  fetch('/setup', { method: 'POST' }).then(r => r.json()).then(() => {
+  fetch('/setup', { method: 'POST' }).then(r => r.json()).then(data => {
+    if (data.already_done) {
+      // Server says we're done — go straight to download
+      clearInterval(setupPoll);
+      document.getElementById('setupScreen').style.display = 'none';
+      document.getElementById('downloadScreen').style.display = 'block';
+      document.getElementById('downloadScreen').classList.add('fade-in');
+      return;
+    }
     setupPoll = setInterval(pollSetup, 800);
   }).catch(err => {
     addLog('setupLog', '❌ Не удалось связаться с сервером: ' + err.message, 'err');
@@ -285,7 +318,9 @@ function pollSetup() {
 
     // Phase labels
     const PHASE_LABELS = {
+      idle: '⏳ Ожидание…',
       checking: '🔍 Проверяю зависимости…',
+      silent_check: '🔍 Тихая проверка…',
       installing_python: '🐍 Устанавливаю Python…',
       installing_ytdlp: '📦 Скачиваю yt-dlp…',
       done: '✅ Всё готово!',
@@ -382,6 +417,31 @@ function download() {
   .catch(err => {
     addLog('dlLog', '❌ ' + err.message, 'err');
     btn.disabled = false; btn.textContent = '⬇️ Скачать';
+  });
+}
+
+/* ── Copy logs ────────────────────────────────────────────── */
+function copyLogs() {
+  const logEl = document.getElementById('dlLog');
+  const text = Array.from(logEl.children).map(el => el.textContent).join('\n');
+  if (!text) { return; }
+  navigator.clipboard.writeText(text).then(() => {
+    const btn = document.getElementById('copyBtn');
+    btn.textContent = '✅ Скопировано!';
+    btn.classList.add('copied');
+    setTimeout(() => {
+      btn.textContent = '📋 Копировать логи';
+      btn.classList.remove('copied');
+    }, 2000);
+  }).catch(() => {
+    // Fallback: select text
+    const range = document.createRange();
+    range.selectNode(logEl);
+    const sel = window.getSelection();
+    sel.removeAllRanges();
+    sel.addRange(range);
+    document.execCommand('copy');
+    sel.removeAllRanges();
   });
 }
 

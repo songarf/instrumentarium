@@ -79,6 +79,9 @@ atexit.register(_cleanup_lock)
 # When PyInstaller builds app.py, sys.executable points to the .exe itself.
 # Using subprocess.Popen([sys.executable, 'server.py']) would launch another
 # copy of the .exe, which launches another, creating a fork bomb.
+
+SETUP_MARKER_PATH = os.path.join(SCRIPT_DIR, ".setup_done")
+
 def _start_server_in_thread():
     log.info("Starting server thread...")
     os.chdir(SCRIPT_DIR)
@@ -86,10 +89,20 @@ def _start_server_in_thread():
         import server as srv
         log.info("Server module imported successfully")
 
-        # Run auto-setup in background
-        t = threading.Thread(target=srv.run_setup, daemon=True)
-        t.start()
-        log.info("Auto-setup thread started")
+        marker_exists = os.path.exists(SETUP_MARKER_PATH)
+        log.info("Setup marker exists: %s", marker_exists)
+
+        if marker_exists:
+            # Already configured — just do a silent dep check, no UI needed
+            log.info("Previous setup found — running silent dep check...")
+            t = threading.Thread(target=srv._ensure_deps, daemon=True)
+            t.start()
+        else:
+            # First launch — run the full visible setup wizard
+            log.info("No setup marker — starting full setup wizard...")
+            t = threading.Thread(target=srv.run_setup, daemon=True)
+            t.start()
+        log.info("Dep-check/setup thread started")
 
         # Start HTTP server
         srv.srv = srv.http.server.HTTPServer(("0.0.0.0", srv.PORT), srv.Handler)

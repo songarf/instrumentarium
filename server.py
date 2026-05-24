@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Video Downloader — Setup Wizard + Server
+Instrumentarium — Setup Wizard + Server
 Checks dependencies, installs yt-dlp, starts the server, opens browser.
 """
 
@@ -24,16 +24,29 @@ SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
 OUTPUT_BASE = os.path.join(SCRIPT_DIR, "downloads")
 YT_DLP_DIR = os.path.join(SCRIPT_DIR, ".bin")
 YT_DLP = os.path.join(YT_DLP_DIR, "yt-dlp.exe" if platform.system() == "Windows" else "yt-dlp")
+SETUP_MARKER = os.path.join(SCRIPT_DIR, ".setup_done")
+
+# ── Subprocess helper — no console windows on Windows ───────────────
+def _popen(cmd, **kwargs):
+    """subprocess.Popen that never flashes a console window on Windows."""
+    if platform.system() == "Windows":
+        kwargs.setdefault("creationflags", subprocess.CREATE_NO_WINDOW)
+    kwargs.setdefault("stdout", subprocess.PIPE)
+    kwargs.setdefault("stderr", subprocess.STDOUT)
+    kwargs.setdefault("text", True)
+    kwargs.setdefault("bufsize", 1)
+    return subprocess.Popen(cmd, **kwargs)
 
 # ── Setup state (shared with HTTP handler) ──────────────────────────
 setup_state = {
-    "phase": "idle",        # idle | checking | installing_python | installing_ytdlp | done | error
+    "phase": "idle",        # idle | checking | silent_check | installing_python | installing_ytdlp | done | error
     "progress": 0,          # 0-100
     "messages": [],         # list of {text, type}
     "python_ok": False,
     "ytdlp_ok": False,
     "server_started": False,
     "error": None,
+    "setup_done": False,    # True if .setup_done marker exists
 }
 
 def msg(text, type="info"):
@@ -49,7 +62,8 @@ def find_system_python():
         p = shutil.which(c)
         if p:
             try:
-                out = subprocess.check_output([p, "--version"], stderr=subprocess.STDOUT, text=True).strip()
+                out = subprocess.check_output([p, "--version"], stderr=subprocess.STDOUT, text=True,
+                                             creationflags=subprocess.CREATE_NO_WINDOW if platform.system() == "Windows" else 0).strip()
                 # Parse version
                 parts = out.split()
                 if len(parts) >= 2:
@@ -65,14 +79,16 @@ def check_ytdlp():
     """Check if yt-dlp exists in .bin/ or system PATH."""
     if os.path.isfile(YT_DLP):
         try:
-            out = subprocess.check_output([YT_DLP, "--version"], stderr=subprocess.STDOUT, text=True).strip()
+            out = subprocess.check_output([YT_DLP, "--version"], stderr=subprocess.STDOUT, text=True,
+                                         creationflags=subprocess.CREATE_NO_WINDOW if platform.system() == "Windows" else 0).strip()
             return True, out
         except:
             pass
     sys_yt = shutil.which("yt-dlp") or shutil.which("yt-dlp.exe")
     if sys_yt:
         try:
-            out = subprocess.check_output([sys_yt, "--version"], stderr=subprocess.STDOUT, text=True).strip()
+            out = subprocess.check_output([sys_yt, "--version"], stderr=subprocess.STDOUT, text=True,
+                                         creationflags=subprocess.CREATE_NO_WINDOW if platform.system() == "Windows" else 0).strip()
             return True, out
         except:
             pass
@@ -191,12 +207,56 @@ def install_python():
         return False
 
 # ── Full setup runner ────────────────────────────────────────────────
+def _write_marker():
+    """Write .setup_done marker file."""
+    try:
+        with open(SETUP_MARKER, "w") as f:
+            f.write(time.strftime("%Y-%m-%d %H:%M:%S"))
+    except Exception as e:
+        log.warning("Could not write setup marker: %s", e)
+
+def _clear_marker():
+    """Remove .setup_done marker file."""
+    try:
+        if os.path.exists(SETUP_MARKER):
+            os.remove(SETUP_MARKER)
+    except Exception:
+        pass
+
+def _ensure_deps():
+    """Silent dependency check — no messages, no UI.
+    Returns True if all deps OK, False if setup is needed.
+    """
+    # Python
+    py_path, _ = find_system_python()
+    if not py_path:
+        log.warning("Silent check: Python not found, setup needed")
+        return False
+
+    # yt-dlp
+    ok, _ = check_ytdlp()
+    if not ok:
+        log.info("Silent check: yt-dlp not found, will download")
+        if not install_ytdlp():
+            return False
+
+    os.makedirs(OUTPUT_BASE, exist_ok=True)
+    setup_state["python_ok"] = True
+    setup_state["ytdlp_ok"] = True
+    setup_state["phase"] = "done"
+    setup_state["progress"] = 100
+    setup_state["server_started"] = True
+    _write_marker()
+    log.info("Silent check passed — all deps OK")
+    return True
+
 def run_setup():
-    """Full setup: check Python → check/install ytdlp → start server."""
+    """Full visible setup: check Python → check/install ytdlp → start server."""
     setup_state["phase"] = "checking"
     setup_state["progress"] = 0
     setup_state["messages"] = []
     setup_state["error"] = None
+    _clear_marker()
 
     log.info("Setup started")
     msg("🔍 Проверяю зависимости…", "info")
@@ -240,6 +300,7 @@ def run_setup():
     setup_state["progress"] = 100
     setup_state["phase"] = "done"
     setup_state["server_started"] = True
+    _write_marker()
     log.info("Setup complete — server ready on port %d", PORT)
 
 # ── HTTP handler ────────────────────────────────────────────────────
@@ -252,6 +313,14 @@ class Handler(http.server.BaseHTTPRequestHandler):
             return
 
         if p.path == "/status":
+            # On first contact, check if setup was already done
+            if setup_state["phase"] == "idle" and os.path.exists(SETUP_MARKER):
+                if _ensure_deps():
+                    setup_state["setup_done"] = True
+                else:
+                    # Marker exists but deps are gone — reset
+                    setup_state["phase"] = "idle"
+                    setup_state["setup_done"] = False
             self._json({
                 "phase": setup_state["phase"],
                 "progress": setup_state["progress"],
@@ -260,6 +329,7 @@ class Handler(http.server.BaseHTTPRequestHandler):
                 "ytdlp_ok": setup_state["ytdlp_ok"],
                 "server_started": setup_state["server_started"],
                 "error": setup_state["error"],
+                "setup_done": os.path.exists(SETUP_MARKER),
             })
             return
 
@@ -278,9 +348,12 @@ class Handler(http.server.BaseHTTPRequestHandler):
 
     def do_POST(self):
         if self.path == "/setup":
-            # Start setup in background thread
+            # If already done, just confirm
+            if setup_state["phase"] == "done" and os.path.exists(SETUP_MARKER):
+                self._json({"ok": True, "already_done": True})
+                return
+            # Start fresh setup in background thread
             if setup_state["phase"] in ("idle", "error", "done"):
-                setup_state["phase"] = "checking"
                 t = threading.Thread(target=run_setup, daemon=True)
                 t.start()
             self._json({"ok": True})
@@ -375,10 +448,10 @@ class JobLogger(threading.Thread):
                "--newline", "--progress", self.url]
 
         j["log"].append(f"[yt-dlp] {self.yt}")
+        j["log"].append(f"[cmd] {' '.join(cmd)}")
 
         try:
-            proc = subprocess.Popen(cmd, stdout=subprocess.PIPE,
-                                    stderr=subprocess.STDOUT, text=True, bufsize=1)
+            proc = _popen(cmd)
             filepath = None
             for line in proc.stdout:
                 line = line.rstrip()
@@ -409,6 +482,17 @@ class JobLogger(threading.Thread):
             else:
                 j["status"] = "error"
                 j["log"].append(f"[error] exit code {proc.returncode}")
+                # Collect stderr if any
+                try:
+                    remaining = proc.stdout.read() if proc.stdout else ""
+                    if remaining:
+                        j["log"].append(f"[stderr] {remaining.strip()}")
+                except Exception:
+                    pass
+        except FileNotFoundError as e:
+            j["status"] = "error"
+            j["log"].append(f"[error] yt-dlp not found: {self.yt}")
+            j["log"].append(f"[error] {e}")
         except Exception as e:
             j["status"] = "error"
             j["log"].append(f"[error] {e}")
