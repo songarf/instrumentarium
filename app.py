@@ -15,13 +15,22 @@ if sys.platform == "win32" and not sys.stdout:
 
 # ── Logging setup ──────────────────────────────────────────────────
 # When running from PyInstaller bundle, __file__ points to temp _MEI dir.
-# Use sys.executable location for persistent log file.
+# Use sys.executable location for runtime data (downloads, .bin).
 if hasattr(sys, "_MEIPASS"):
     _BASE_DIR = os.path.dirname(os.path.abspath(sys.executable))
 else:
     _BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 
-LOG_PATH = os.path.join(_BASE_DIR, "instrumentarium.log")
+# ── Persistent state directory ──────────────────────────────────────
+# Use %LOCALAPPDATA%\Instrumentarium for all persistent files
+if sys.platform == "win32":
+    _PERSIST_DIR = os.path.join(os.environ.get("LOCALAPPDATA", ""), "Instrumentarium")
+else:
+    _PERSIST_DIR = os.path.join(os.environ.get("HOME", ""), ".instrumentarium")
+os.makedirs(_PERSIST_DIR, exist_ok=True)
+
+# Log to persistent directory (survives reinstalls, always writable)
+LOG_PATH = os.path.join(_PERSIST_DIR, "instrumentarium.log")
 
 # Logging can be disabled with INSTRUMENTARIUM_LOG=0
 _LOGGING_ENABLED = os.environ.get("INSTRUMENTARIUM_LOG", "1") != "0"
@@ -48,11 +57,11 @@ if hasattr(sys, "_MEIPASS"):
 
 # ── Single instance lock ───────────────────────────────────────────
 # Use %LOCALAPPDATA%\Instrumentarium for lock file (same as server.py)
-if sys.platform == "win32":
-    _PERSIST_DIR = os.path.join(os.environ.get("LOCALAPPDATA", ""), "Instrumentarium")
-else:
-    _PERSIST_DIR = os.path.join(os.environ.get("HOME", ""), ".instrumentarium")
-os.makedirs(_PERSIST_DIR, exist_ok=True)
+# if sys.platform == "win32":
+#     _PERSIST_DIR = os.path.join(os.environ.get("LOCALAPPDATA", ""), "Instrumentarium")
+# else:
+#     _PERSIST_DIR = os.path.join(os.environ.get("HOME", ""), ".instrumentarium")
+# os.makedirs(_PERSIST_DIR, exist_ok=True)
 
 _LOCK_PATH = os.path.join(_PERSIST_DIR, ".instrumentarium.lock")
 _SETUP_MARKER_PATH = os.path.join(_PERSIST_DIR, ".setup_done")
@@ -153,66 +162,58 @@ for _ in range(50):
 else:
     log.warning("Server didn't start in time, proceeding anyway")
 
-# ── Open UI in app window (pywebview) with browser fallback ──────────
+# ── Open UI in a native app window (pywebview) ─────────────────────
 log.info("Opening window...")
 try:
     import webview
-    
-    # Check if WebView2 Runtime is available on Windows
-    _webview2_available = False
-    if sys.platform == "win32":
+
+    window = webview.create_window(
+        "Instrumentarium",
+        url="http://localhost:18765",
+        width=620,
+        height=700,
+        resizable=True,
+        min_size=(540, 500),
+    )
+
+    if window:
+        # Close the server cleanly when the user closes the window
+        def _on_closing():
+            log.info("Window closing — shutting down server")
+            import server as srv
+            if hasattr(srv, "srv") and srv.srv:
+                srv.srv.shutdown()
+
+        window.events.closing += _on_closing
+
+    # Try renderers in order of preference:
+    #   1. edgechromium (WebView2, modern Chromium — needs WebView2 Runtime)
+    #   2. cef (Chromium Embedded — bundled, no external deps)
+    #   3. default auto-detect (GTK/Qt/Cocoa depending on platform)
+    _renderers = ["edgechromium", "cef"] if sys.platform == "win32" else []
+    _started = False
+    for _gui in _renderers:
         try:
-            import winreg
-            # Check registry for WebView2 Evergreen Runtime
-            key_path = r"SOFTWARE\WOW6432Node\Microsoft\EdgeUpdate\Clients\{F3017226-FE2A-4295-8BDF-00C3A9A7E4C5}"
-            try:
-                key = winreg.OpenKey(winreg.HKEY_LOCAL_MACHINE, key_path)
-                val, _ = winreg.QueryValueEx(key, "pv")
-                winreg.CloseKey(key)
-                if val and val != "0.0.0.0":
-                    _webview2_available = True
-                    log.info("WebView2 Runtime found: %s", val)
-            except FileNotFoundError:
-                # Try 32-bit registry
-                try:
-                    key_path32 = r"SOFTWARE\Microsoft\EdgeUpdate\Clients\{F3017226-FE2A-4295-8BDF-00C3A9A7E4C5}"
-                    key = winreg.OpenKey(winreg.HKEY_LOCAL_MACHINE, key_path32)
-                    val, _ = winreg.QueryValueEx(key, "pv")
-                    winreg.CloseKey(key)
-                    if val and val != "0.0.0.0":
-                        _webview2_available = True
-                        log.info("WebView2 Runtime found: %s", val)
-                except FileNotFoundError:
-                    log.info("WebView2 Runtime not found in registry")
-        except Exception as e:
-            log.info("Could not check WebView2 registry: %s", e)
-    
-    if _webview2_available:
-        # Use native WebView2 window
-        log.info("Using WebView2 for native window")
-        webview.create_window(
-            "Instrumentarium",
-            url="http://localhost:18765",
-            width=620,
-            height=700,
-            resizable=True,
-            min_size=(540, 500),
-        )
-        webview.start(gui="edgechromium")
-    else:
-        # Fallback: open in default browser
-        log.info("WebView2 not available, falling back to system browser")
-        raise ImportError("WebView2 not available")
-        
+            log.info("Trying webview gui=%s ...", _gui)
+            webview.start(gui=_gui)
+            _started = True
+            break
+        except Exception as _e:
+            log.warning("webview gui=%s failed: %s", _gui, _e)
+
+    if not _started:
+        log.info("Falling back to webview auto-detect")
+        webview.start()
+
 except Exception as e:
-    if "import" in str(e).lower() or "WebView2" in str(e):
-        log.info("pywebview/WebView2 not available, using webbrowser fallback: %s", e)
-    import webbrowser
+    log.error("Could not open native window: %s", e, exc_info=True)
+    # Last resort: system browser with proper cleanup via atexit
+    import webbrowser, threading
     webbrowser.open("http://localhost:18765")
-    log.info("Browser opened — keeping server alive")
-    # Keep the process alive so the server keeps running
+    log.info("Opened in system browser — server runs until window closes")
+    # Block main thread so the server keeps running.
+    # The server thread is daemon, so when the user kills the process, it exits.
     try:
-        while True:
-            time.sleep(1)
+        threading.Event().wait()
     except KeyboardInterrupt:
         pass

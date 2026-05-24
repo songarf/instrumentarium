@@ -3,12 +3,20 @@
 
 block_cipher = None
 
+try:
+    from PyInstaller.utils.hooks import collect_all
+    webview_datas, webview_binaries, webview_hiddenimports = collect_all('webview')
+except Exception:
+    webview_datas, webview_binaries, webview_hiddenimports = [], [], ['webview']
+
 a = Analysis(
     ['app.py', 'server.py'],
     pathex=[],
-    binaries=[],
-    datas=[],
-    hiddenimports=['bottle', 'proxy_tools'],
+    binaries=webview_binaries,
+    datas=webview_datas + [
+        ('download.html', '.'),
+    ],
+    hiddenimports=webview_hiddenimports + ['bottle', 'proxy_tools'],
     hookspath=[],
     hooksconfig={},
     runtime_hooks=[],
