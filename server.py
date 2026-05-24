@@ -20,9 +20,29 @@ def _safe_print(*args, **kwargs):
 
 # ── Config ──────────────────────────────────────────────────────────
 PORT = 18765
-SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
+
+# When running from PyInstaller bundle, SCRIPT_DIR points to the temp
+# extraction folder (_MEIxxxxx/) which is recreated on every launch.
+# For persistent state (setup marker, downloads) we use the folder
+# where the .exe/.py lives — sys._MEIPASS is temp, sys.executable is real.
+if hasattr(sys, "_MEIPASS"):
+    # PyInstaller bundle — persistent data goes next to the exe
+    _EXE_DIR = os.path.dirname(os.path.abspath(sys.executable))
+    SCRIPT_DIR = _EXE_DIR
+else:
+    SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
+
+# But yt-dlp binary lives in _MEIPASS/.bin during PyInstaller runs
+if hasattr(sys, "_MEIPASS"):
+    _BIN_CANDIDATES = [
+        os.path.join(os.path.dirname(os.path.abspath(sys.executable)), ".bin"),  # beside exe
+        os.path.join(sys._MEIPASS, ".bin"),  # inside bundle
+    ]
+else:
+    _BIN_CANDIDATES = [os.path.join(SCRIPT_DIR, ".bin")]
+
 OUTPUT_BASE = os.path.join(SCRIPT_DIR, "downloads")
-YT_DLP_DIR = os.path.join(SCRIPT_DIR, ".bin")
+YT_DLP_DIR = _BIN_CANDIDATES[0]  # primary: beside exe (persists across launches)
 YT_DLP = os.path.join(YT_DLP_DIR, "yt-dlp.exe" if platform.system() == "Windows" else "yt-dlp")
 SETUP_MARKER = os.path.join(SCRIPT_DIR, ".setup_done")
 
@@ -76,14 +96,18 @@ def find_system_python():
     return None, None
 
 def check_ytdlp():
-    """Check if yt-dlp exists in .bin/ or system PATH."""
-    if os.path.isfile(YT_DLP):
-        try:
-            out = subprocess.check_output([YT_DLP, "--version"], stderr=subprocess.STDOUT, text=True,
-                                         creationflags=subprocess.CREATE_NO_WINDOW if platform.system() == "Windows" else 0).strip()
-            return True, out
-        except:
-            pass
+    """Check if yt-dlp exists in any known location."""
+    # Check all bin candidates (beside exe first, then bundle)
+    for d in _BIN_CANDIDATES:
+        candidate = os.path.join(d, "yt-dlp.exe" if platform.system() == "Windows" else "yt-dlp")
+        if os.path.isfile(candidate):
+            try:
+                out = subprocess.check_output([candidate, "--version"], stderr=subprocess.STDOUT, text=True,
+                                             creationflags=subprocess.CREATE_NO_WINDOW if platform.system() == "Windows" else 0).strip()
+                return True, out
+            except:
+                pass
+    # Also check system PATH
     sys_yt = shutil.which("yt-dlp") or shutil.which("yt-dlp.exe")
     if sys_yt:
         try:
@@ -110,7 +134,8 @@ def install_ytdlp():
         urllib.request.urlretrieve(url, YT_DLP)
         if not is_win:
             os.chmod(YT_DLP, 0o755)
-        ver = subprocess.check_output([YT_DLP, "--version"], stderr=subprocess.STDOUT, text=True).strip()
+        ver = subprocess.check_output([YT_DLP, "--version"], stderr=subprocess.STDOUT, text=True,
+                                     creationflags=subprocess.CREATE_NO_WINDOW if platform.system() == "Windows" else 0).strip()
         msg(f"✅ yt-dlp {ver} установлен", "ok")
         log.info("yt-dlp %s installed at %s", ver, YT_DLP)
         setup_state["progress"] = 70
@@ -206,7 +231,24 @@ def install_python():
         setup_state["error"] = str(e)
         return False
 
-# ── Full setup runner ────────────────────────────────────────────────
+def _find_ffmpeg():
+    """Look for ffmpeg binary near the exe or in PATH. Returns path or None."""
+    if platform.system() == "Windows":
+        names = ["ffmpeg.exe", "ffmpeg"]
+    else:
+        names = ["ffmpeg"]
+    # Check beside exe first
+    exe_dir = os.path.dirname(os.path.abspath(sys.executable)) if hasattr(sys, "_MEIPASS") else SCRIPT_DIR
+    for name in names:
+        candidate = os.path.join(exe_dir, ".bin", name)
+        if os.path.isfile(candidate):
+            return candidate
+    # Check system PATH
+    return shutil.which("ffmpeg") or shutil.which("ffmpeg.exe")
+
+def _has_ffmpeg():
+    """Return True if ffmpeg is available."""
+    return _find_ffmpeg() is not None
 def _write_marker():
     """Write .setup_done marker file."""
     try:
@@ -372,7 +414,15 @@ class Handler(http.server.BaseHTTPRequestHandler):
                 return
             jid = str(uuid.uuid4())[:8]
             download_jobs[jid] = {"log": [], "status": "running"}
-            yt = YT_DLP if os.path.isfile(YT_DLP) else shutil.which("yt-dlp") or "yt-dlp"
+            # Find yt-dlp: check all candidates, then system PATH
+            yt = None
+            for d in _BIN_CANDIDATES:
+                candidate = os.path.join(d, "yt-dlp.exe" if platform.system() == "Windows" else "yt-dlp")
+                if os.path.isfile(candidate):
+                    yt = candidate
+                    break
+            if not yt:
+                yt = shutil.which("yt-dlp") or shutil.which("yt-dlp.exe") or "yt-dlp"
             JobLogger(jid, url, mode, yt).start()
             self._json({"job_id": jid, "platform": detect_platform(url)})
             return
@@ -434,18 +484,35 @@ class JobLogger(threading.Thread):
         out_dir = os.path.join(OUTPUT_BASE, j["platform"])
         os.makedirs(out_dir, exist_ok=True)
 
+        # Check if ffmpeg is available — adapt format/merge strategy
+        ffmpeg = _find_ffmpeg()
+        ffmpeg_ok = ffmpeg is not None
+
         if self.mode == "audio":
             fmt = "bestaudio[ext=m4a]/bestaudio"
             post = ["--extract-audio", "--audio-format", "mp3", "--audio-quality", "0"]
+            # ffmpeg needed for audio extraction too
+            if not ffmpeg_ok:
+                j["log"].append("[warn] ffmpeg not found — audio extraction may fail. Install ffmpeg for best results.")
         else:
-            fmt = "bestvideo[ext=mp4]+bestaudio[ext=m4a]/best[ext=mp4]/best"
-            post = ["--merge-output-format", "mp4"]
+            if ffmpeg_ok:
+                # ffmpeg available: download best video+audio and merge
+                fmt = "bestvideo[ext=mp4]+bestaudio[ext=m4a]/best[ext=mp4]/best"
+                post = ["--merge-output-format", "mp4"]
+            else:
+                # No ffmpeg: download single-file format (video+audio muxed)
+                fmt = "best[ext=mp4]/bestvideo[ext=mp4]+bestaudio[ext=m4a]/best"
+                post = []  # no merge without ffmpeg
+                j["log"].append("[warn] ffmpeg not found — downloading single-file format (may be lower quality)")
 
         out_tmpl = os.path.join(out_dir, "%(title)s [%(id)s].%(ext)s")
         cmd = [self.yt, "-f", fmt, *post, "-o", out_tmpl,
                "--no-playlist", "--retries", "3",
                "--embed-metadata", "--embed-thumbnail",
                "--newline", "--progress", self.url]
+
+        if ffmpeg_ok:
+            cmd += ["--ffmpeg-location", os.path.dirname(ffmpeg)]
 
         j["log"].append(f"[yt-dlp] {self.yt}")
         j["log"].append(f"[cmd] {' '.join(cmd)}")
