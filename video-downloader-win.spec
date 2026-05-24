@@ -8,7 +8,6 @@ a = Analysis(
     pathex=[],
     binaries=[],
     datas=[
-        ('download.html', '.'),
         ('server.py', '.'),
     ],
     hiddenimports=['webview', 'bottle', 'proxy_tools'],
