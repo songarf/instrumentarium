@@ -13,37 +13,21 @@ if sys.platform == "win32" and not sys.stdout:
     sys.stdout = open(os.devnull, "w")
     sys.stderr = open(os.devnull, "w")
 
-# ── Logging setup ──────────────────────────────────────────────────
-# When running from PyInstaller bundle, __file__ points to temp _MEI dir.
-# Use sys.executable location for runtime data (downloads, .bin).
+# ── Working directory ───────────────────────────────────────────────
+# All working files (logs, .bin, downloads, .setup_done, lock) go beside
+# the .exe / script — single folder, no scattering across the system.
 if hasattr(sys, "_MEIPASS"):
     _BASE_DIR = os.path.dirname(os.path.abspath(sys.executable))
 else:
     _BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+os.makedirs(_BASE_DIR, exist_ok=True)
 
-# ── Persistent state directory ──────────────────────────────────────
-# Use %LOCALAPPDATA%\Instrumentarium for all persistent files
-if sys.platform == "win32":
-    _PERSIST_DIR = os.path.join(os.environ.get("LOCALAPPDATA", ""), "Instrumentarium")
-else:
-    _PERSIST_DIR = os.path.join(os.environ.get("HOME", ""), ".instrumentarium")
-os.makedirs(_PERSIST_DIR, exist_ok=True)
-
-# Log to BOTH persistent dir and beside the exe so the user can always find it
+# ── Logging ──────────────────────────────────────────────────────────
 _LOG_HANDLERS = []
-# Persistent dir (survives reinstalls)
-if _PERSIST_DIR:
-    try:
-        _LOG_HANDLERS.append(logging.FileHandler(os.path.join(_PERSIST_DIR, "instrumentarium.log"), encoding="utf-8"))
-    except Exception:
-        pass
-# Beside the exe/bundle (user-visible)
-if _BASE_DIR:
-    try:
-        _LOG_HANDLERS.append(logging.FileHandler(os.path.join(_BASE_DIR, "instrumentarium.log"), encoding="utf-8"))
-    except Exception:
-        pass
-# Fallback: current directory
+try:
+    _LOG_HANDLERS.append(logging.FileHandler(os.path.join(_BASE_DIR, "instrumentarium.log"), encoding="utf-8"))
+except Exception:
+    pass
 if not _LOG_HANDLERS:
     try:
         _LOG_HANDLERS.append(logging.FileHandler("instrumentarium.log", encoding="utf-8"))
@@ -71,15 +55,8 @@ if hasattr(sys, "_MEIPASS"):
     log.info("PyInstaller bundle: %s", sys._MEIPASS)
 
 # ── Single instance lock ───────────────────────────────────────────
-# Use %LOCALAPPDATA%\Instrumentarium for lock file (same as server.py)
-# if sys.platform == "win32":
-#     _PERSIST_DIR = os.path.join(os.environ.get("LOCALAPPDATA", ""), "Instrumentarium")
-# else:
-#     _PERSIST_DIR = os.path.join(os.environ.get("HOME", ""), ".instrumentarium")
-# os.makedirs(_PERSIST_DIR, exist_ok=True)
-
-_LOCK_PATH = os.path.join(_PERSIST_DIR, ".instrumentarium.lock")
-_SETUP_MARKER_PATH = os.path.join(_PERSIST_DIR, ".setup_done")
+_LOCK_PATH = os.path.join(_BASE_DIR, ".instrumentarium.lock")
+_SETUP_MARKER_PATH = os.path.join(_BASE_DIR, ".setup_done")
 _lock_fd = None
 
 def _acquire_lock():

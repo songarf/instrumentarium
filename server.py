@@ -30,9 +30,13 @@ def _ensure_log_handler():
     When run from app.py, basicConfig already set up a root FileHandler
     that this logger inherits. When run standalone, add our own."""
     if not log.handlers and not logging.getLogger().handlers:
-        _persist_dir = os.path.join(os.environ.get("LOCALAPPDATA", os.environ.get("HOME", "")), "Instrumentarium") if os.name == "nt" else os.path.join(os.environ.get("HOME", ""), ".instrumentarium")
-        os.makedirs(_persist_dir, exist_ok=True)
-        _log_path = os.path.join(_persist_dir, "instrumentarium.log")
+        # Use same logic as app.py for base directory
+        if hasattr(sys, "_MEIPASS"):
+            _base = os.path.dirname(os.path.abspath(sys.executable))
+        else:
+            _base = os.path.dirname(os.path.abspath(__file__))
+        os.makedirs(_base, exist_ok=True)
+        _log_path = os.path.join(_base, "instrumentarium.log")
         _fh = logging.FileHandler(_log_path, encoding="utf-8")
         _fh.setFormatter(logging.Formatter("%(asctime)s [%(levelname)s] %(message)s"))
         log.addHandler(_fh)
@@ -52,17 +56,17 @@ def _safe_print(*args, **kwargs):
 # ── Config ──────────────────────────────────────────────────────────
 PORT = 18765
 
-# ── Persistent state directory ──────────────────────────────────────
-# Use %LOCALAPPDATA%\Instrumentarium for all persistent files so they
-# survive antivirus cleanup, OneDrive sync issues, etc.
-if platform.system() == "Windows":
-    _PERSIST_DIR = os.path.join(os.environ.get("LOCALAPPDATA", ""), "Instrumentarium")
+# ── Working directory ───────────────────────────────────────────────
+# All working files (logs, .bin, downloads, .setup_done, lock) go beside
+# the .exe / script — single folder, no scattering across the system.
+if hasattr(sys, "_MEIPASS"):
+    _BASE_DIR = os.path.dirname(os.path.abspath(sys.executable))
 else:
-    _PERSIST_DIR = os.path.join(os.environ.get("HOME", ""), ".instrumentarium")
-os.makedirs(_PERSIST_DIR, exist_ok=True)
+    _BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+os.makedirs(_BASE_DIR, exist_ok=True)
 
-SETUP_MARKER = os.path.join(_PERSIST_DIR, ".setup_done")
-_LOCK_PATH = os.path.join(_PERSIST_DIR, ".instrumentarium.lock")
+SETUP_MARKER = os.path.join(_BASE_DIR, ".setup_done")
+_LOCK_PATH = os.path.join(_BASE_DIR, ".instrumentarium.lock")
 
 # When running from PyInstaller, __file__ points to temp _MEI dir.
 # Use sys.executable location for runtime data (downloads, .bin).
@@ -72,12 +76,12 @@ if hasattr(sys, "_MEIPASS"):
 else:
     SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
 
-OUTPUT_BASE = os.path.join(_PERSIST_DIR, "downloads")
+OUTPUT_BASE = os.path.join(_BASE_DIR, "downloads")
 
-# yt-dlp binary locations — persist in AppData to survive reinstalls
+# yt-dlp binary locations — all beside the exe
 if hasattr(sys, "_MEIPASS"):
     _BIN_CANDIDATES = [
-        os.path.join(_PERSIST_DIR, ".bin"),
+        os.path.join(_BASE_DIR, ".bin"),
         os.path.join(_EXE_DIR, ".bin"),
         os.path.join(sys._MEIPASS, ".bin"),
     ]
