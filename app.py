@@ -143,6 +143,9 @@ def _start_server_in_thread():
         log.error("Server thread error: %s", e, exc_info=True)
 
 log.info("Launching server thread...")
+server_thread = threading.Thread(target=_start_server_in_thread, daemon=True)
+server_thread.start()
+log.info("Server thread launched, id=%d", server_thread.ident)
 
 # Wait until server is actually listening (max 5s)
 import socket

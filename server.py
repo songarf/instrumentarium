@@ -486,20 +486,26 @@ class Handler(http.server.BaseHTTPRequestHandler):
             return
 
         if self.path == "/download":
+            log.info("/download: phase=%s, url_body_pending", setup_state["phase"])
             if setup_state["phase"] == "error":
-                self._json({"error": "Setup failed: " + str(setup_state.get("error", "unknown"))})
+                err = setup_state.get("error", "unknown")
+                log.warning("/download: setup in error state: %s", err)
+                self._json({"error": "Setup failed: " + str(err)})
                 return
             if setup_state["phase"] not in ("done", "silent_check"):
+                log.warning("/download: setup not complete, phase=%s", setup_state["phase"])
                 self._json({"error": "Setup not complete"})
                 return
             # Wait for silent dep check to finish if it's still running
             if setup_state["phase"] == "silent_check":
+                log.info("/download: waiting for silent dep check (timeout=30s)...")
                 _wait_deps(self)
                 return
             length = int(self.headers.get("Content-Length", 0))
             body = json.loads(self.rfile.read(length) or b"{}")
             url = body.get("url", "").strip()
             mode = body.get("mode", "video")
+            log.info("/download: url=%s mode=%s", url, mode)
             if not url:
                 self._json({"error": "URL is required"})
                 return
@@ -514,7 +520,9 @@ class Handler(http.server.BaseHTTPRequestHandler):
                     break
             if not yt:
                 yt = shutil.which("yt-dlp") or shutil.which("yt-dlp.exe") or "yt-dlp"
+            log.info("/download: yt-dlp resolved to: %s (exists=%s)", yt, os.path.isfile(yt))
             JobLogger(jid, url, mode, yt).start()
+            log.info("/download: job started, job_id=%s", jid)
             self._json({"job_id": jid, "platform": detect_platform(url)})
             return
 
@@ -606,26 +614,27 @@ class JobLogger(threading.Thread):
         out_dir = os.path.join(OUTPUT_BASE, j["platform"])
         os.makedirs(out_dir, exist_ok=True)
 
-        # Check if ffmpeg is available — adapt format/merge strategy
+        log.info("JobLogger[%s]: starting download url=%s mode=%s", self.job_id, self.url, self.mode)
+        log.info("JobLogger[%s]: out_dir=%s", self.job_id, out_dir)
+        log.info("JobLogger[%s]: yt-dlp path=%s exists=%s", self.job_id, self.yt, os.path.isfile(self.yt))
+
         ffmpeg = _find_ffmpeg()
         ffmpeg_ok = ffmpeg is not None
+        log.info("JobLogger[%s]: ffmpeg=%s", self.job_id, ffmpeg)
 
         if self.mode == "audio":
             fmt = "bestaudio[ext=m4a]/bestaudio"
             post = ["--extract-audio", "--audio-format", "mp3", "--audio-quality", "0"]
-            # ffmpeg needed for audio extraction too
             if not ffmpeg_ok:
-                j["log"].append("[warn] ffmpeg not found — audio extraction may fail. Install ffmpeg for best results.")
+                j["log"].append("[warn] ffmpeg not found — audio extraction may fail")
         else:
             if ffmpeg_ok:
-                # ffmpeg available: download best video+audio and merge
                 fmt = "bestvideo[ext=mp4]+bestaudio[ext=m4a]/best[ext=mp4]/best"
                 post = ["--merge-output-format", "mp4"]
             else:
-                # No ffmpeg: download single-file format (video+audio muxed)
                 fmt = "best[ext=mp4]/bestvideo[ext=mp4]+bestaudio[ext=m4a]/best"
-                post = []  # no merge without ffmpeg
-                j["log"].append("[warn] ffmpeg not found — downloading single-file format (may be lower quality)")
+                post = []
+                j["log"].append("[warn] ffmpeg not found — downloading single-file format")
 
         out_tmpl = os.path.join(out_dir, "%(title)s [%(id)s].%(ext)s")
         cmd = [self.yt, "-f", fmt, *post, "-o", out_tmpl,
@@ -638,20 +647,29 @@ class JobLogger(threading.Thread):
 
         j["log"].append(f"[yt-dlp] {self.yt}")
         j["log"].append(f"[cmd] {' '.join(cmd)}")
+        log.info("JobLogger[%s]: cmd=%s", self.job_id, " ".join(cmd))
 
         try:
+            log.info("JobLogger[%s]: calling _popen...", self.job_id)
             proc = _popen(cmd)
+            log.info("JobLogger[%s]: popen returned, pid=%s", self.job_id, proc.pid)
             filepath = None
+            line_count = 0
             for line in proc.stdout:
                 line = line.rstrip()
-                if not line: continue
+                if not line:
+                    continue
+                line_count += 1
                 j["log"].append(line)
                 if "[download] Destination:" in line:
                     filepath = line.split("Destination:", 1)[1].strip()
                 elif line.startswith("[Merger]") and "into" in line:
-                    idx = line.rfind('"'); idx2 = line.rfind('"', 0, idx)
-                    if idx > idx2: filepath = line[idx2+1:idx]
+                    idx = line.rfind('"')
+                    idx2 = line.rfind('"', 0, idx)
+                    if idx > idx2:
+                        filepath = line[idx2+1:idx]
             proc.wait()
+            log.info("JobLogger[%s]: process exited, returncode=%d, lines_read=%d", self.job_id, proc.returncode, line_count)
 
             if proc.returncode == 0:
                 j["status"] = "done"
@@ -666,30 +684,29 @@ class JobLogger(threading.Thread):
                     if files:
                         j["filepath"] = os.path.join(out_dir, files[0])
                         j["filename"] = files[0]
-                size = os.path.getsize(j["filepath"]) if j.get("filepath") and os.path.exists(j.get("filepath","")) else 0
+                size = os.path.getsize(j["filepath"]) if j.get("filepath") and os.path.exists(j.get("filepath", "")) else 0
                 j["log"].append(f"[done] {j.get('filename','?')} ({_human(size)})")
-                log.info("Download complete: %s (%s)", j.get("filename","?"), _human(size))
+                log.info("JobLogger[%s]: download complete: %s (%s)", self.job_id, j.get("filename", "?"), _human(size))
             else:
                 j["status"] = "error"
                 j["log"].append(f"[error] exit code {proc.returncode}")
-                log.error("Download failed (exit %d): url=%s", proc.returncode, self.url)
-                # Collect stderr if any
+                log.error("JobLogger[%s]: download failed (exit %d)", self.job_id, proc.returncode)
                 try:
                     remaining = proc.stdout.read() if proc.stdout else ""
                     if remaining:
                         j["log"].append(f"[stderr] {remaining.strip()}")
-                        log.error("yt-dlp stderr: %s", remaining.strip())
+                        log.error("JobLogger[%s]: stderr: %s", self.job_id, remaining.strip())
                 except Exception:
                     pass
         except FileNotFoundError as e:
             j["status"] = "error"
             j["log"].append(f"[error] yt-dlp not found: {self.yt}")
             j["log"].append(f"[error] {e}")
-            log.error("yt-dlp not found: %s (url=%s)", self.yt, self.url)
+            log.error("JobLogger[%s]: yt-dlp not found: %s", self.job_id, self.yt)
         except Exception as e:
             j["status"] = "error"
             j["log"].append(f"[error] {e}")
-            log.error("Download error: %s (url=%s)", e, self.url, exc_info=True)
+            log.error("JobLogger[%s]: exception: %s", self.job_id, e, exc_info=True)
 
 def _human(n):
     for u in ['B','KB','MB','GB']:
