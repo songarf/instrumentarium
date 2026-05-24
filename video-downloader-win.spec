@@ -10,7 +10,7 @@ a = Analysis(
     datas=[
         ('server.py', '.'),
     ],
-    hiddenimports=['webview', 'bottle', 'proxy_tools'],
+    hiddenimports=['bottle', 'proxy_tools'],
     hookspath=[],
     hooksconfig={},
     runtime_hooks=[],

@@ -62,10 +62,10 @@ jobs:
 
       - name: Install build deps
         run: |
-          pip install pyinstaller pywebview
+          pip install pyinstaller
 
       - name: Build binary
-        run: pyinstaller ${{ matrix.spec }} --distpath dist --workpath build
+        run: pyinstaller ${{ matrix.spec }} --clean --distpath dist --workpath build
 
       - name: Prepare archive (Windows)
         if: runner.os == 'Windows'
