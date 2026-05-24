@@ -585,23 +585,28 @@ class JobLogger(threading.Thread):
                         j["filename"] = files[0]
                 size = os.path.getsize(j["filepath"]) if j.get("filepath") and os.path.exists(j.get("filepath","")) else 0
                 j["log"].append(f"[done] {j.get('filename','?')} ({_human(size)})")
+                log.info("Download complete: %s (%s)", j.get("filename","?"), _human(size))
             else:
                 j["status"] = "error"
                 j["log"].append(f"[error] exit code {proc.returncode}")
+                log.error("Download failed (exit %d): url=%s", proc.returncode, self.url)
                 # Collect stderr if any
                 try:
                     remaining = proc.stdout.read() if proc.stdout else ""
                     if remaining:
                         j["log"].append(f"[stderr] {remaining.strip()}")
+                        log.error("yt-dlp stderr: %s", remaining.strip())
                 except Exception:
                     pass
         except FileNotFoundError as e:
             j["status"] = "error"
             j["log"].append(f"[error] yt-dlp not found: {self.yt}")
             j["log"].append(f"[error] {e}")
+            log.error("yt-dlp not found: %s (url=%s)", self.yt, self.url)
         except Exception as e:
             j["status"] = "error"
             j["log"].append(f"[error] {e}")
+            log.error("Download error: %s (url=%s)", e, self.url, exc_info=True)
 
 def _human(n):
     for u in ['B','KB','MB','GB']:
