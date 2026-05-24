@@ -101,7 +101,7 @@ atexit.register(_cleanup_lock)
 # Using subprocess.Popen([sys.executable, 'server.py']) would launch another
 # copy of the .exe, which launches another, creating a fork bomb.
 
-SETUP_MARKER_PATH = os.path.join(_BASE_DIR, ".setup_done")
+SETUP_MARKER_PATH = _SETUP_MARKER_PATH
 
 def _start_server_in_thread():
     log.info("Starting server thread...")
@@ -140,6 +140,19 @@ server_thread = threading.Thread(target=_start_server_in_thread, daemon=True)
 server_thread.start()
 log.info("Server thread launched")
 
+# Wait until server is actually listening (max 5s)
+import socket
+for _ in range(50):
+    try:
+        sock = socket.create_connection(("127.0.0.1", 18765), timeout=0.1)
+        sock.close()
+        log.info("Server is ready on port 18765")
+        break
+    except (ConnectionRefusedError, OSError):
+        time.sleep(0.1)
+else:
+    log.warning("Server didn't start in time, proceeding anyway")
+
 # ── Open native window ─────────────────────────────────────────────
 log.info("Creating webview window...")
 import webview
@@ -154,5 +167,10 @@ webview.create_window(
 )
 
 log.info("Starting webview main loop")
-webview.start()
+# Prefer Edge WebView2 on Windows; fall back to default if unavailable
+try:
+    webview.start(gui="edgechromium")
+except Exception:
+    log.warning("edgechromium not available, trying default")
+    webview.start()
 log.info("webview exited — shutting down")
