@@ -97,10 +97,14 @@ SETUP_MARKER_PATH = os.path.join(_BASE_DIR, ".setup_done")
 
 def _start_server_in_thread():
     log.info("Starting server thread...")
+    log.info("_BASE_DIR: %s", _BASE_DIR)
+    log.info("SETUP_MARKER_PATH: %s", SETUP_MARKER_PATH)
     os.chdir(_BASE_DIR)
     try:
         import server as srv
         log.info("Server module imported successfully")
+        log.info("server.SCRIPT_DIR: %s", srv.SCRIPT_DIR)
+        log.info("server.SETUP_MARKER: %s", srv.SETUP_MARKER)
 
         marker_exists = os.path.exists(SETUP_MARKER_PATH)
         log.info("Setup marker exists: %s", marker_exists)

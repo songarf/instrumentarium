@@ -130,30 +130,57 @@ def install_ytdlp():
     """Download yt-dlp into .bin/."""
     os.makedirs(YT_DLP_DIR, exist_ok=True)
     is_win = platform.system() == "Windows"
-    url = "https://github.com/yt-dlp/yt-dlp/releases/latest/download/yt-dlp.exe" if is_win \
-          else "https://github.com/yt-dlp/yt-dlp/releases/latest/download/yt-dlp"
+
+    # Multiple URLs to try (GitHub + mirrors)
+    if is_win:
+        urls = [
+            "https://github.com/yt-dlp/yt-dlp/releases/latest/download/yt-dlp.exe",
+            "https://github.com/yt-dlp/yt-dlp/releases/latest/download/yt-dlp.exe",
+        ]
+    else:
+        urls = [
+            "https://github.com/yt-dlp/yt-dlp/releases/latest/download/yt-dlp",
+        ]
 
     setup_state["phase"] = "installing_ytdlp"
     msg(f"⬇️  Скачиваю yt-dlp…", "info")
-    log.info("Downloading yt-dlp from %s", url)
+    log.info("Downloading yt-dlp, trying %d URLs", len(urls))
     setup_state["progress"] = 50
 
-    try:
-        urllib.request.urlretrieve(url, YT_DLP)
-        if not is_win:
-            os.chmod(YT_DLP, 0o755)
-        ver = subprocess.check_output([YT_DLP, "--version"], stderr=subprocess.STDOUT, text=True,
-                                     creationflags=subprocess.CREATE_NO_WINDOW if platform.system() == "Windows" else 0).strip()
-        msg(f"✅ yt-dlp {ver} установлен", "ok")
-        log.info("yt-dlp %s installed at %s", ver, YT_DLP)
-        setup_state["progress"] = 70
-        return True
-    except Exception as e:
-        msg(f"❌ Ошибка загрузки yt-dlp: {e}", "err")
-        log.error("yt-dlp installation failed: %s", e)
-        setup_state["error"] = str(e)
-        setup_state["phase"] = "error"
-        return False
+    for url in urls:
+        log.info("Trying: %s", url)
+        try:
+            # Use curl for better proxy/redirect support
+            if shutil.which("curl"):
+                cmd = ["curl", "-L", "-f", "--connect-timeout", "15", "--max-time", "120",
+                       "-o", YT_DLP, url]
+                result = subprocess.run(cmd, capture_output=True, text=True, timeout=130,
+                                       creationflags=subprocess.CREATE_NO_WINDOW if is_win else 0)
+                if result.returncode != 0:
+                    log.warning("curl failed (%d): %s", result.returncode, result.stderr[:200])
+                    continue
+            else:
+                # Fallback to urllib
+                urllib.request.urlretrieve(url, YT_DLP)
+
+            if not is_win:
+                os.chmod(YT_DLP, 0o755)
+
+            ver = subprocess.check_output([YT_DLP, "--version"], stderr=subprocess.STDOUT, text=True,
+                                         creationflags=subprocess.CREATE_NO_WINDOW if is_win else 0).strip()
+            msg(f"✅ yt-dlp {ver} установлен", "ok")
+            log.info("yt-dlp %s installed at %s", ver, YT_DLP)
+            setup_state["progress"] = 70
+            return True
+        except Exception as e:
+            log.warning("Failed to download from %s: %s", url, e)
+            continue
+
+    msg(f"❌ Ошибка загрузки yt-dlp: все источники недоступны", "err")
+    log.error("yt-dlp installation failed from all URLs")
+    setup_state["error"] = "yt-dlp download failed (502/503/timeout)"
+    setup_state["phase"] = "error"
+    return False
 
 def get_python_install_url():
     """Return the official Python download URL for current OS."""
@@ -260,18 +287,21 @@ def _has_ffmpeg():
 def _write_marker():
     """Write .setup_done marker file."""
     try:
+        log.info("Writing setup marker to: %s", SETUP_MARKER)
         with open(SETUP_MARKER, "w") as f:
             f.write(time.strftime("%Y-%m-%d %H:%M:%S"))
+        log.info("Setup marker written successfully")
     except Exception as e:
-        log.warning("Could not write setup marker: %s", e)
+        log.warning("Could not write setup marker to %s: %s", SETUP_MARKER, e)
 
 def _clear_marker():
     """Remove .setup_done marker file."""
     try:
         if os.path.exists(SETUP_MARKER):
+            log.info("Removing setup marker: %s", SETUP_MARKER)
             os.remove(SETUP_MARKER)
-    except Exception:
-        pass
+    except Exception as e:
+        log.warning("Could not remove setup marker: %s", e)
 
 def _ensure_deps():
     """Silent dependency check — no messages, no UI.
