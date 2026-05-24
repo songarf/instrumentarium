@@ -135,7 +135,8 @@ def _start_server_in_thread():
 
         log.info("Creating HTTP server on 0.0.0.0:%d...", 18765)
         srv.srv = srv.http.server.HTTPServer(("0.0.0.0", srv.PORT), srv.Handler)
-        srv.srv.timeout = 1.0  # 1-second timeout on accept() for responsive shutdown
+        # Short timeout so serve_forever() checks for shutdown frequently
+        srv.srv.timeout = 0.5
         log.info("HTTP server created, calling serve_forever()...")
         srv.srv.serve_forever()
         log.info("serve_forever() returned — server thread exiting")
@@ -184,9 +185,16 @@ try:
                 import server as srv
                 log.info("server.srv exists: %s", hasattr(srv, "srv") and srv.srv is not None)
                 if hasattr(srv, "srv") and srv.srv:
-                    log.info("Calling srv.srv.shutdown()...")
-                    srv.srv.shutdown()
-                    log.info("srv.srv.shutdown() done")
+                    log.info("Scheduling srv.srv.shutdown() in background...")
+                    # Run shutdown in a daemon thread so we don't block the UI thread.
+                    # The server thread has a 0.5s accept timeout, so it will exit quickly.
+                    _t = threading.Thread(target=lambda: (
+                        log.info("shutdown thread: calling srv.srv.shutdown()..."),
+                        srv.srv.shutdown(),
+                        log.info("shutdown thread: srv.srv.shutdown() done")
+                    ), daemon=True)
+                    _t.start()
+                    log.info("shutdown thread started, returning to UI")
                 else:
                     log.warning("server.srv not available — cannot shutdown gracefully")
             except Exception as e:

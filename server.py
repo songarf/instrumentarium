@@ -99,7 +99,8 @@ def _popen(cmd, **kwargs):
     kwargs.setdefault("stdout", subprocess.PIPE)
     kwargs.setdefault("stderr", subprocess.STDOUT)
     kwargs.setdefault("text", True)
-    kwargs.setdefault("bufsize", 1)
+    # Do NOT set bufsize=1 — line-buffered text mode can deadlock with
+    # stderr redirected to stdout. Use default buffering and read all at once.
     return subprocess.Popen(cmd, **kwargs)
 
 # ── Setup state (shared with HTTP handler) ──────────────────────────
@@ -653,13 +654,12 @@ class JobLogger(threading.Thread):
             log.info("JobLogger[%s]: calling _popen...", self.job_id)
             proc = _popen(cmd)
             log.info("JobLogger[%s]: popen returned, pid=%s", self.job_id, proc.pid)
+            # Wait for process to complete and read all output at once
+            stdout_data, _ = proc.communicate(timeout=600)
+            log.info("JobLogger[%s]: process exited, returncode=%d, output_chars=%d", self.job_id, proc.returncode, len(stdout_data))
+            # Parse output line by line
             filepath = None
-            line_count = 0
-            for line in proc.stdout:
-                line = line.rstrip()
-                if not line:
-                    continue
-                line_count += 1
+            for line in stdout_data.splitlines():
                 j["log"].append(line)
                 if "[download] Destination:" in line:
                     filepath = line.split("Destination:", 1)[1].strip()
@@ -668,8 +668,9 @@ class JobLogger(threading.Thread):
                     idx2 = line.rfind('"', 0, idx)
                     if idx > idx2:
                         filepath = line[idx2+1:idx]
-            proc.wait()
-            log.info("JobLogger[%s]: process exited, returncode=%d, lines_read=%d", self.job_id, proc.returncode, line_count)
+            # Log last 5 lines for quick diagnosis
+            last_lines = stdout_data.splitlines()[-5:] if stdout_data else []
+            log.info("JobLogger[%s]: last output lines: %s", self.job_id, last_lines)
 
             if proc.returncode == 0:
                 j["status"] = "done"
@@ -690,14 +691,7 @@ class JobLogger(threading.Thread):
             else:
                 j["status"] = "error"
                 j["log"].append(f"[error] exit code {proc.returncode}")
-                log.error("JobLogger[%s]: download failed (exit %d)", self.job_id, proc.returncode)
-                try:
-                    remaining = proc.stdout.read() if proc.stdout else ""
-                    if remaining:
-                        j["log"].append(f"[stderr] {remaining.strip()}")
-                        log.error("JobLogger[%s]: stderr: %s", self.job_id, remaining.strip())
-                except Exception:
-                    pass
+                log.error("JobLogger[%s]: download failed (exit %d), output:\n%s", self.job_id, proc.returncode, stdout_data[-500:] if stdout_data else "(empty)")
         except FileNotFoundError as e:
             j["status"] = "error"
             j["log"].append(f"[error] yt-dlp not found: {self.yt}")
