@@ -448,7 +448,7 @@ class Handler(http.server.BaseHTTPRequestHandler):
                 setup_state["setup_done"] = True
             elif setup_state["phase"] == "idle":
                 setup_state["setup_done"] = False
-            self._json({
+            resp = {
                 "phase": setup_state["phase"],
                 "progress": setup_state["progress"],
                 "messages": setup_state["messages"],
@@ -457,7 +457,9 @@ class Handler(http.server.BaseHTTPRequestHandler):
                 "server_started": setup_state["server_started"],
                 "error": setup_state["error"],
                 "setup_done": os.path.exists(SETUP_MARKER),
-            })
+            }
+            log.info("/status: phase=%s setup_done=%s marker_exists=%s", setup_state["phase"], resp["setup_done"], os.path.exists(SETUP_MARKER))
+            self._json(resp)
             return
 
         if p.path == "/log":
@@ -640,8 +642,10 @@ class JobLogger(threading.Thread):
         out_tmpl = os.path.join(out_dir, "%(title)s [%(id)s].%(ext)s")
         cmd = [self.yt, "-f", fmt, *post, "-o", out_tmpl,
                "--no-playlist", "--retries", "3",
-               "--embed-metadata", "--embed-thumbnail",
                "--newline", "--progress", self.url]
+        # Embedding metadata/thumbnails requires ffmpeg
+        if ffmpeg_ok:
+            cmd += ["--embed-metadata", "--embed-thumbnail"]
 
         if ffmpeg_ok:
             cmd += ["--ffmpeg-location", os.path.dirname(ffmpeg)]
