@@ -25,22 +25,29 @@ _EMBEDDED_HTML = '<!DOCTYPE html>\n<html lang="ru">\n<head>\n<meta charset="UTF-
 # ── Config ──────────────────────────────────────────────────────────
 PORT = 18765
 
-# When running from PyInstaller bundle, __file__ points to temp _MEI dir.
-# For persistent state we use the exe location. For bundled read-only data
-# (download.html, icons) we look in _MEIPASS first, then beside exe.
+# ── Persistent state directory ──────────────────────────────────────
+# Use %LOCALAPPDATA%\Instrumentarium for all persistent files so they
+# survive antivirus cleanup, OneDrive sync issues, etc.
+if platform.system() == "Windows":
+    _PERSIST_DIR = os.path.join(os.environ.get("LOCALAPPDATA", ""), "Instrumentarium")
+else:
+    _PERSIST_DIR = os.path.join(os.environ.get("HOME", ""), ".instrumentarium")
+os.makedirs(_PERSIST_DIR, exist_ok=True)
+
+SETUP_MARKER = os.path.join(_PERSIST_DIR, ".setup_done")
+_LOCK_PATH = os.path.join(_PERSIST_DIR, ".instrumentarium.lock")
+
+# When running from PyInstaller, __file__ points to temp _MEI dir.
+# Use sys.executable location for runtime data (downloads, .bin).
 if hasattr(sys, "_MEIPASS"):
     _EXE_DIR = os.path.dirname(os.path.abspath(sys.executable))
     SCRIPT_DIR = _EXE_DIR
-    _DATA_DIRS = [sys._MEIPASS, _EXE_DIR]
 else:
     SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
-    _DATA_DIRS = [SCRIPT_DIR]
 
-_OUTPUT_BASE = os.path.join(SCRIPT_DIR, "downloads")
-_SETUP_MARKER = os.path.join(SCRIPT_DIR, ".setup_done")
-_LOCK_PATH = os.path.join(SCRIPT_DIR, ".instrumentarium.lock")
+OUTPUT_BASE = os.path.join(SCRIPT_DIR, "downloads")
 
-# yt-dlp binary locations (beside exe first, then bundle)
+# yt-dlp binary locations
 if hasattr(sys, "_MEIPASS"):
     _BIN_CANDIDATES = [
         os.path.join(_EXE_DIR, ".bin"),
@@ -49,9 +56,7 @@ if hasattr(sys, "_MEIPASS"):
 else:
     _BIN_CANDIDATES = [os.path.join(SCRIPT_DIR, ".bin")]
 
-OUTPUT_BASE = _OUTPUT_BASE
 YT_DLP_DIR = _BIN_CANDIDATES[0]
-SETUP_MARKER = _SETUP_MARKER
 YT_DLP = os.path.join(YT_DLP_DIR, "yt-dlp.exe" if platform.system() == "Windows" else "yt-dlp")
 
 # ── Subprocess helper — no console windows on Windows ───────────────

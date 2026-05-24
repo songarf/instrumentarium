@@ -47,7 +47,15 @@ if hasattr(sys, "_MEIPASS"):
     log.info("PyInstaller bundle: %s", sys._MEIPASS)
 
 # ── Single instance lock ───────────────────────────────────────────
-_LOCK_PATH = os.path.join(_BASE_DIR, ".instrumentarium.lock")
+# Use %LOCALAPPDATA%\Instrumentarium for lock file (same as server.py)
+if sys.platform == "win32":
+    _PERSIST_DIR = os.path.join(os.environ.get("LOCALAPPDATA", ""), "Instrumentarium")
+else:
+    _PERSIST_DIR = os.path.join(os.environ.get("HOME", ""), ".instrumentarium")
+os.makedirs(_PERSIST_DIR, exist_ok=True)
+
+_LOCK_PATH = os.path.join(_PERSIST_DIR, ".instrumentarium.lock")
+_SETUP_MARKER_PATH = os.path.join(_PERSIST_DIR, ".setup_done")
 _lock_fd = None
 
 def _acquire_lock():
@@ -98,7 +106,7 @@ SETUP_MARKER_PATH = os.path.join(_BASE_DIR, ".setup_done")
 def _start_server_in_thread():
     log.info("Starting server thread...")
     log.info("_BASE_DIR: %s", _BASE_DIR)
-    log.info("SETUP_MARKER_PATH: %s", SETUP_MARKER_PATH)
+    log.info("_SETUP_MARKER_PATH: %s", _SETUP_MARKER_PATH)
     os.chdir(_BASE_DIR)
     try:
         import server as srv
@@ -106,7 +114,7 @@ def _start_server_in_thread():
         log.info("server.SCRIPT_DIR: %s", srv.SCRIPT_DIR)
         log.info("server.SETUP_MARKER: %s", srv.SETUP_MARKER)
 
-        marker_exists = os.path.exists(SETUP_MARKER_PATH)
+        marker_exists = os.path.exists(_SETUP_MARKER_PATH)
         log.info("Setup marker exists: %s", marker_exists)
 
         if marker_exists:
