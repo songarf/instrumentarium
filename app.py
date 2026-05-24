@@ -83,18 +83,21 @@ if not _acquire_lock():
 
 def _cleanup_lock():
     global _lock_fd
+    log.info("_cleanup_lock: running")
     if _lock_fd:
         try:
             _lock_fd.close()
-        except Exception:
-            pass
+            log.info("_cleanup_lock: lock fd closed")
+        except Exception as e:
+            log.warning("_cleanup_lock: error closing lock fd: %s", e)
     try:
         os.remove(_LOCK_PATH)
-        log.info("Lock released")
+        log.info("_cleanup_lock: lock file removed: %s", _LOCK_PATH)
     except Exception:
-        pass
+        log.info("_cleanup_lock: lock file already gone or not removable")
 
 atexit.register(_cleanup_lock)
+log.info("atexit handler registered: _cleanup_lock")
 
 # ── Start the backend server in a background thread ─────────────────
 # CRITICAL: We run server code IN-PROCESS, not via subprocess.
@@ -105,45 +108,41 @@ atexit.register(_cleanup_lock)
 SETUP_MARKER_PATH = _SETUP_MARKER_PATH
 
 def _start_server_in_thread():
-    log.info("Starting server thread...")
+    log.info("=== Server thread starting ===")
     log.info("_BASE_DIR: %s", _BASE_DIR)
     log.info("_SETUP_MARKER_PATH: %s", _SETUP_MARKER_PATH)
     os.chdir(_BASE_DIR)
+    log.info("CWD after chdir: %s", os.getcwd())
     try:
         import server as srv
-        log.info("Server module imported successfully")
         log.info("server.SCRIPT_DIR: %s", srv.SCRIPT_DIR)
         log.info("server.SETUP_MARKER: %s", srv.SETUP_MARKER)
+        log.info("server._BASE_DIR: %s", srv._BASE_DIR)
 
         marker_exists = os.path.exists(_SETUP_MARKER_PATH)
-        log.info("Setup marker exists: %s", marker_exists)
+        log.info(".setup_done exists: %s", marker_exists)
 
         if marker_exists:
-            # Already configured — just do a silent dep check, no UI needed.
-            # Set phase IMMEDIATELY so /status returns silent_check right away,
-            # preventing the setup screen from flashing on repeated launches.
             srv.setup_state["phase"] = "silent_check"
             srv.setup_state["setup_done"] = True
-            log.info("Previous setup found — running silent dep check...")
+            log.info("Starting silent dep check thread...")
             t = threading.Thread(target=srv._ensure_deps, daemon=True)
             t.start()
         else:
-            # First launch — run the full visible setup wizard
-            log.info("No setup marker — starting full setup wizard...")
+            log.info("Starting full setup wizard thread...")
             t = threading.Thread(target=srv.run_setup, daemon=True)
             t.start()
-        log.info("Dep-check/setup thread started")
 
-        # Start HTTP server
+        log.info("Creating HTTP server on 0.0.0.0:%d...", 18765)
         srv.srv = srv.http.server.HTTPServer(("0.0.0.0", srv.PORT), srv.Handler)
-        log.info("HTTP server listening on port %d", srv.PORT)
+        srv.srv.timeout = 1.0  # 1-second timeout on accept() for responsive shutdown
+        log.info("HTTP server created, calling serve_forever()...")
         srv.srv.serve_forever()
+        log.info("serve_forever() returned — server thread exiting")
     except Exception as e:
         log.error("Server thread error: %s", e, exc_info=True)
 
-server_thread = threading.Thread(target=_start_server_in_thread, daemon=True)
-server_thread.start()
-log.info("Server thread launched")
+log.info("Launching server thread...")
 
 # Wait until server is actually listening (max 5s)
 import socket
@@ -173,12 +172,23 @@ try:
     )
 
     if window:
-        # Close the server cleanly when the user closes the window
         def _on_closing():
-            log.info("Window closing — shutting down server")
-            import server as srv
-            if hasattr(srv, "srv") and srv.srv:
-                srv.srv.shutdown()
+            log.info("=== Window close event received ===")
+            log.info("Thread count: %d", threading.active_count())
+            for t in threading.enumerate():
+                log.info("  thread: %s (daemon=%s)", t.name, t.daemon)
+            try:
+                import server as srv
+                log.info("server.srv exists: %s", hasattr(srv, "srv") and srv.srv is not None)
+                if hasattr(srv, "srv") and srv.srv:
+                    log.info("Calling srv.srv.shutdown()...")
+                    srv.srv.shutdown()
+                    log.info("srv.srv.shutdown() done")
+                else:
+                    log.warning("server.srv not available — cannot shutdown gracefully")
+            except Exception as e:
+                log.error("Error during window closing: %s", e, exc_info=True)
+            log.info("_on_closing complete")
 
         window.events.closing += _on_closing
 
@@ -192,6 +202,7 @@ try:
         try:
             log.info("Trying webview gui=%s ...", _gui)
             webview.start(gui=_gui)
+            log.info("webview.start(gui=%s) returned — window closed", _gui)
             _started = True
             break
         except Exception as _e:
@@ -200,16 +211,17 @@ try:
     if not _started:
         log.info("Falling back to webview auto-detect")
         webview.start()
+        log.info("webview.start() returned — window closed")
+
+    log.info("=== pywebview event loop exited ===")
 
 except Exception as e:
     log.error("Could not open native window: %s", e, exc_info=True)
-    # Last resort: system browser with proper cleanup via atexit
     import webbrowser, threading
     webbrowser.open("http://localhost:18765")
-    log.info("Opened in system browser — server runs until window closes")
-    # Block main thread so the server keeps running.
-    # The server thread is daemon, so when the user kills the process, it exits.
+    log.info("Opened in system browser — blocking main thread")
     try:
         threading.Event().wait()
     except KeyboardInterrupt:
         pass
+    log.info("Main thread unblocked — exiting")

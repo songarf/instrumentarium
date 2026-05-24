@@ -332,7 +332,7 @@ def _write_marker():
             f.write(time.strftime("%Y-%m-%d %H:%M:%S"))
         log.info("Setup marker written successfully")
     except Exception as e:
-        log.warning("Could not write setup marker to %s: %s", SETUP_MARKER, e)
+        log.error("Could not write setup marker to %s: %s", SETUP_MARKER, e)
 
 def _clear_marker():
     """Remove .setup_done marker file."""
@@ -341,38 +341,43 @@ def _clear_marker():
             log.info("Removing setup marker: %s", SETUP_MARKER)
             os.remove(SETUP_MARKER)
     except Exception as e:
-        log.warning("Could not remove setup marker: %s", e)
+        log.error("Could not remove setup marker: %s", e)
 
 def _ensure_deps():
-    """Silent dependency check — no messages, no UI.
-    Returns True if all deps OK, False if setup is needed.
-    """
-    # Python
-    py_path, _ = find_system_python()
-    if not py_path:
-        log.warning("Silent check: Python not found, setup needed")
-        return False
-
-    # yt-dlp
-    ok, _ = check_ytdlp()
-    if not ok:
-        log.info("Silent check: yt-dlp not found, will download")
-        if not install_ytdlp():
+    """Silent dependency check — no messages, no UI."""
+    log.info("_ensure_deps: starting silent dep check")
+    try:
+        py_path, _ = find_system_python()
+        if not py_path:
+            log.warning("_ensure_deps: Python not found, setup needed")
             return False
+        log.info("_ensure_deps: Python found: %s", py_path)
 
-    os.makedirs(OUTPUT_BASE, exist_ok=True)
-    setup_state["python_ok"] = True
-    setup_state["ytdlp_ok"] = True
-    setup_state["phase"] = "done"
-    setup_state["progress"] = 100
-    setup_state["server_started"] = True
-    _write_marker()
-    log.info("Silent check passed — all deps OK")
-    return True
+        ok, ver = check_ytdlp()
+        if not ok:
+            log.info("_ensure_deps: yt-dlp not found, downloading...")
+            if not install_ytdlp():
+                log.error("_ensure_deps: yt-dlp download failed")
+                return False
+        else:
+            log.info("_ensure_deps: yt-dlp found: %s", ver)
+
+        os.makedirs(OUTPUT_BASE, exist_ok=True)
+        setup_state["python_ok"] = True
+        setup_state["ytdlp_ok"] = True
+        setup_state["phase"] = "done"
+        setup_state["progress"] = 100
+        setup_state["server_started"] = True
+        _write_marker()
+        log.info("_ensure_deps: all deps OK, phase=done")
+        return True
+    except Exception as e:
+        log.error("_ensure_deps: exception: %s", e, exc_info=True)
+        return False
 
 def run_setup():
     """Full visible setup: check Python → check/install ytdlp → start server."""
-    setup_state["phase"] = "checking"
+    log.info("run_setup: starting full setup wizard")
     setup_state["progress"] = 0
     setup_state["messages"] = []
     setup_state["error"] = None
@@ -515,7 +520,9 @@ class Handler(http.server.BaseHTTPRequestHandler):
 
         self.send_error(404)
 
-    def log_message(self, *a): pass
+    def log_message(self, format, *args):
+        """Override default stderr logging — write to our log file instead."""
+        log.debug("HTTP %s %s", self.command, self.path)
 
     def _json(self, data):
         body = json.dumps(data).encode()
