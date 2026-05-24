@@ -43,11 +43,12 @@ if hasattr(sys, "_MEIPASS"):
 else:
     SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
 
-OUTPUT_BASE = os.path.join(SCRIPT_DIR, "downloads")
+OUTPUT_BASE = os.path.join(_PERSIST_DIR, "downloads")
 
-# yt-dlp binary locations
+# yt-dlp binary locations — persist in AppData to survive reinstalls
 if hasattr(sys, "_MEIPASS"):
     _BIN_CANDIDATES = [
+        os.path.join(_PERSIST_DIR, ".bin"),
         os.path.join(_EXE_DIR, ".bin"),
         os.path.join(sys._MEIPASS, ".bin"),
     ]
