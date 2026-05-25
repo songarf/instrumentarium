@@ -639,31 +639,50 @@ class Handler(http.server.BaseHTTPRequestHandler):
                 # Build simplified format list — only video formats with resolution
                 formats = []
                 for f in formats_raw:
+                    width = f.get("width") or 0
                     height = f.get("height") or 0
                     ext = f.get("ext", "?")
                     filesize = f.get("filesize") or f.get("filesize_approx") or 0
                     vcodec = f.get("vcodec", "none")
                     acodec = f.get("acodec", "none")
+                    format_note = f.get("format_note", "")
                     # Skip audio-only for video list
                     if vcodec == "none" or height == 0:
                         continue
+                    # For vertical videos (height > width), yt-dlp reports height as the
+                    # long edge (e.g. 1920 for a 1080x1920 video). Use format_note for
+                    # the human-readable label, and use width as the sort key since that's
+                    # the actual "resolution class" for vertical content.
+                    is_vertical = height > width
+                    # Effective resolution for sorting/display:
+                    # - horizontal video: use height (standard 1080p, 720p etc)
+                    # - vertical video: use width (that's the real resolution class)
+                    eff_height = height if not is_vertical else width
+                    # Parse resolution label from format_note (e.g. "1080p", "720p")
+                    # or fall back to eff_height
+                    res_label = format_note if format_note else f"{eff_height}p"
                     formats.append({
                         "format_id": f.get("format_id", ""),
                         "ext": ext,
-                        "height": height,
+                        "height": eff_height,
+                        "display_label": res_label,
                         "filesize": filesize,
                         "vcodec": vcodec,
                         "acodec": acodec,
-                        "format_note": f.get("format_note", ""),
                     })
-                # Sort by height desc
+                # Sort by effective resolution desc
                 formats.sort(key=lambda x: (-x["height"], -x["filesize"]))
-                # Deduplicate by height — keep best (largest) for each resolution
-                seen_heights = set()
+                # Deduplicate by resolution — group into standard buckets
+                # Round to nearest standard: 144, 240, 360, 480, 720, 1080, 1440, 2160
+                def nearest_std(h):
+                    buckets = [144, 240, 360, 480, 720, 1080, 1440, 2160, 4320]
+                    return min(buckets, key=lambda b: abs(b - h))
+                seen_res = set()
                 unique_formats = []
                 for f in formats:
-                    if f["height"] not in seen_heights:
-                        seen_heights.add(f["height"])
+                    bucket = nearest_std(f["height"])
+                    if bucket not in seen_res:
+                        seen_res.add(bucket)
                         unique_formats.append(f)
                 self._json({
                     "title": title,

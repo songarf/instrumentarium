@@ -425,16 +425,18 @@ function renderResButtons() {
   }
   container.innerHTML = '';
 
-  // Pick resolutions to show based on available max height
-  const maxH = probedFormats.length ? probedFormats[0].height : 0;
+  // Determine which resolution buttons to show based on effective height
+  // For vertical videos, eff_height = width (e.g. 1080 for 1080x1920)
+  // We treat 1080 eff_height as "1080p" vertical = show single button
+  const maxH = uniqueFormats.length ? uniqueFormats[0].height : 0;
   let targets = [];
   if (maxH >= 2160) {
-    targets = [2160, 1440, 1080];
+    targets = [2160, 1440, 1080];  // 4K horizontal
   } else if (maxH >= 1440) {
-    targets = [1440, 1080];
+    targets = [1440, 1080];        // 2K horizontal
   } else {
-    // Show the two best resolutions (or one if only one)
-    const unique = [...new Set(probedFormats.map(f => f.height))];
+    // For vertical video (maxH ~1080) or low-res horizontal: show top 2 unique
+    const unique = [...new Set(uniqueFormats.map(f => f.height))];
     targets = unique.slice(0, 2);
   }
 
@@ -453,7 +455,7 @@ function renderResButtons() {
     if (!best) continue;
     const btn = document.createElement('button');
     btn.className = 'res-btn';
-    const resLabel = best.height >= 2160 ? '4K' : best.height >= 1440 ? '2K' : best.height + 'p';
+    const resLabel = best.display_label || (best.height + 'p');
     const sizeStr = best.filesize ? _human(best.filesize) : '~';
     btn.innerHTML = `<span class="res-label">${resLabel}</span><span class="res-meta">${sizeStr} · ${best.ext.toUpperCase()}</span>`;
     btn.onclick = () => startDownload(best.format_id, best.height);
