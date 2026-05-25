@@ -689,9 +689,9 @@ class Handler(http.server.BaseHTTPRequestHandler):
                     elif eff_height > 0:
                         res_label = f"{eff_height}p"
                     elif video_ext and video_ext != "none":
-                        res_label = video_ext.upper()
+                        res_label = "Скачать видео"
                     else:
-                        res_label = "SD"
+                        res_label = "Скачать видео"
                     # Skip formats with completely unknown resolution (no height, no width, no note)
                     if eff_height == 0 and not format_note:
                         # Keep it only if it's the only format (LinkedIn-style single format)
