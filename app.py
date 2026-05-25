@@ -193,6 +193,10 @@ try:
         def _on_closing():
             log.info("=== Window close event received ===")
             _do_cleanup()
+            log.info("=== Final exit ===")
+            # Give it a moment to finish logging/shutdown
+            time.sleep(0.5)
+            os._exit(0)
 
         window.events.closing += _on_closing
 
@@ -201,6 +205,9 @@ try:
     def _sigterm_handler(signum, frame):
         log.info("=== SIGTERM received ===")
         _do_cleanup()
+        log.info("=== Final exit ===")
+        time.sleep(0.5)
+        os._exit(0)
     _signal.signal(_signal.SIGTERM, _sigterm_handler)
 
     # Try renderers in order of preference:

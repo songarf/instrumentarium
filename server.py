@@ -531,6 +531,14 @@ def run_setup():
     _write_marker()
     log.info("Setup complete — server ready on port %d", PORT)
 
+def _find_ytdlp():
+    """Find yt-dlp binary. Returns path or None."""
+    for d in _BIN_CANDIDATES:
+        candidate = os.path.join(d, "yt-dlp.exe" if platform.system() == "Windows" else "yt-dlp")
+        if os.path.isfile(candidate):
+            return candidate
+    return shutil.which("yt-dlp") or shutil.which("yt-dlp.exe")
+
 # ── HTTP handler ────────────────────────────────────────────────────
 class Handler(http.server.BaseHTTPRequestHandler):
     def do_GET(self):
@@ -588,6 +596,74 @@ class Handler(http.server.BaseHTTPRequestHandler):
             self._json({"lines": j["log"][off:], "status": j["status"]})
             return
 
+        if p.path == "/probe":
+            qs = parse_qs(p.query)
+            url = qs.get("url", [""])[0].strip()
+            if not url:
+                self._json({"error": "URL is required"})
+                return
+            yt = _find_ytdlp()
+            if not yt:
+                self._json({"error": "yt-dlp not found"})
+                return
+            try:
+                cmd = [yt, "--dump-single-json", "--no-download", "--no-playlist", "--no-check-certificates", url]
+                log.info("/probe: cmd=%s", " ".join(cmd))
+                proc = _popen(cmd)
+                stdout_data, _ = proc.communicate(timeout=30)
+                if proc.returncode != 0:
+                    self._json({"error": "Failed to probe video", "details": stdout_data[:500]})
+                    return
+                data = json.loads(stdout_data)
+                # Extract relevant format info
+                title = data.get("title", "Unknown")
+                duration = data.get("duration", 0)
+                thumbnail = data.get("thumbnail", "")
+                formats_raw = data.get("formats", [])
+                # Build simplified format list — only video formats with resolution
+                formats = []
+                for f in formats_raw:
+                    height = f.get("height") or 0
+                    ext = f.get("ext", "?")
+                    filesize = f.get("filesize") or f.get("filesize_approx") or 0
+                    vcodec = f.get("vcodec", "none")
+                    acodec = f.get("acodec", "none")
+                    # Skip audio-only for video list
+                    if vcodec == "none" or height == 0:
+                        continue
+                    formats.append({
+                        "format_id": f.get("format_id", ""),
+                        "ext": ext,
+                        "height": height,
+                        "filesize": filesize,
+                        "vcodec": vcodec,
+                        "acodec": acodec,
+                        "format_note": f.get("format_note", ""),
+                    })
+                # Sort by height desc
+                formats.sort(key=lambda x: (-x["height"], -x["filesize"]))
+                # Deduplicate by height — keep best (largest) for each resolution
+                seen_heights = set()
+                unique_formats = []
+                for f in formats:
+                    if f["height"] not in seen_heights:
+                        seen_heights.add(f["height"])
+                        unique_formats.append(f)
+                self._json({
+                    "title": title,
+                    "duration": duration,
+                    "thumbnail": thumbnail,
+                    "formats": unique_formats,
+                })
+                log.info("/probe: found %d unique resolutions for '%s'", len(unique_formats), title)
+            except subprocess.TimeoutExpired:
+                proc.kill()
+                self._json({"error": "Probe timed out"})
+            except Exception as e:
+                log.error("/probe: exception: %s", e, exc_info=True)
+                self._json({"error": str(e)})
+            return
+
         self.send_error(404)
 
     def do_POST(self):
@@ -622,24 +698,21 @@ class Handler(http.server.BaseHTTPRequestHandler):
             length = int(self.headers.get("Content-Length", 0))
             body = json.loads(self.rfile.read(length) or b"{}")
             url = body.get("url", "").strip()
-            mode = body.get("mode", "video")
-            log.info("/download: url=%s mode=%s", url, mode)
+            dl_mode = body.get("mode", "video")
+            format_id = body.get("format_id", "")
+            log.info("/download: url=%s mode=%s format_id=%s", url, dl_mode, format_id)
             if not url:
                 self._json({"error": "URL is required"})
                 return
             jid = str(uuid.uuid4())[:8]
             download_jobs[jid] = {"log": [], "status": "running"}
-            # Find yt-dlp: check all candidates, then system PATH
-            yt = None
-            for d in _BIN_CANDIDATES:
-                candidate = os.path.join(d, "yt-dlp.exe" if platform.system() == "Windows" else "yt-dlp")
-                if os.path.isfile(candidate):
-                    yt = candidate
-                    break
+            # Find yt-dlp
+            yt = _find_ytdlp()
             if not yt:
-                yt = shutil.which("yt-dlp") or shutil.which("yt-dlp.exe") or "yt-dlp"
-            log.info("/download: yt-dlp resolved to: %s (exists=%s)", yt, os.path.isfile(yt))
-            JobLogger(jid, url, mode, yt).start()
+                self._json({"error": "yt-dlp not found — run setup first"})
+                return
+            log.info("/download: yt-dlp resolved to: %s", yt)
+            JobLogger(jid, url, dl_mode, yt, format_id).start()
             log.info("/download: job started, job_id=%s", jid)
             self._json({"job_id": jid, "platform": detect_platform(url)})
             return
@@ -737,12 +810,13 @@ def detect_platform(url):
     return "other"
 
 class JobLogger(threading.Thread):
-    def __init__(self, job_id, url, mode, yt_dlp_path):
+    def __init__(self, job_id, url, mode, yt_dlp_path, format_id=""):
         super().__init__(daemon=True)
         self.job_id = job_id
         self.url = url
         self.mode = mode
         self.yt = yt_dlp_path
+        self.format_id = format_id
 
     def run(self):
         j = download_jobs[self.job_id]
@@ -764,7 +838,14 @@ class JobLogger(threading.Thread):
             if not ffmpeg_ok:
                 j["log"].append("[warn] ffmpeg not found — audio extraction may fail")
         else:
-            if ffmpeg_ok:
+            # If a specific format_id was requested (from resolution button),
+            # use it directly instead of auto-selecting best.
+            if self.format_id:
+                fmt = self.format_id
+                post = ["--merge-output-format", "mp4"]
+                if ffmpeg_ok:
+                    post += ["--recode-video", "mp4"]
+            elif ffmpeg_ok:
                 # With ffmpeg: best video + best audio, merge + recode to mp4.
                 # No container restriction on bestvideo — Shorts may have
                 # better streams in webm/VP9/AV1; ffmpeg handles recoding.

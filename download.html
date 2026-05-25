@@ -31,7 +31,8 @@
   .subtitle { font-size: .82rem; color: #666; margin-bottom: 28px; line-height: 1.5; }
 
   /* ── Setup screen ──────────────────────────────────────── */
-  .setup-screen { text-align: center; }
+  .setup-screen { text-align: center; display: none; }
+  .setup-screen.active { display: block; }
 
   .setup-icon {
     font-size: 3.5rem; margin-bottom: 16px;
@@ -89,23 +90,36 @@
   /* ── Download screen ────────────────────────────────────── */
   .download-screen { display: none; }
 
+  .url-input-row {
+    display: flex; gap: 8px; margin-bottom: 12px; align-items: center;
+  }
+
   label {
     display: block; font-size: .78rem; text-transform: uppercase;
     letter-spacing: .08em; color: #888; margin-bottom: 8px;
   }
 
-  input[type="url"] {
-    width: 100%; background: #12122a; border: 1px solid #2a2a4a;
+  #urlInput {
+    flex: 1; background: #12122a; border: 1px solid #2a2a4a;
     border-radius: 10px; padding: 12px 16px; color: #e0e0e0;
-    font-size: .95rem; outline: none; transition: border .2s; margin-bottom: 16px;
+    font-size: .95rem; outline: none; transition: border .2s;
   }
-  input[type="url"]:focus { border-color: #6c5ce7; }
-  input[type="url"]::placeholder { color: #444; }
+  #urlInput:focus { border-color: #6c5ce7; }
+  #urlInput::placeholder { color: #444; }
+  #urlInput.valid { border-color: #4caf50; }
+  #urlInput.invalid { border-color: #ff4757; }
+
+  .clear-btn {
+    background: none; border: 1px solid #2a2a4a; border-radius: 10px;
+    padding: 12px 14px; color: #888; cursor: pointer; font-size: 1rem;
+    transition: all .2s; flex-shrink: 0;
+  }
+  .clear-btn:hover { border-color: #ff4757; color: #ff4757; }
 
   .platform-badge {
     display: inline-block; background: #12122a; border: 1px solid #2a2a4a;
     border-radius: 6px; padding: 3px 10px; font-size: .75rem; color: #888;
-    margin-bottom: 18px; opacity: 0; transition: opacity .3s;
+    margin-bottom: 14px; opacity: 0; transition: opacity .3s;
   }
   .platform-badge.visible { opacity: 1; }
   .platform-youtube { color: #ff4757; border-color: #ff4757; }
@@ -116,7 +130,8 @@
   .platform-linkedin { color: #0077b5; border-color: #0077b5; }
   .platform-other { color: #a78bfa; border-color: #a78bfa; }
 
-  .options { display: flex; gap: 12px; margin-bottom: 24px; }
+  /* ── Mode toggle ────────────────────────────────────────── */
+  .options { display: flex; gap: 12px; margin-bottom: 16px; }
   .opt-btn {
     flex: 1; background: #12122a; border: 1px solid #2a2a4a;
     border-radius: 10px; padding: 14px 10px; text-align: center;
@@ -127,18 +142,58 @@
   .opt-btn.active { border-color: #6c5ce7; background: #1a1040; color: #a78bfa; }
   .opt-btn .icon { font-size: 1.5rem; display: block; margin-bottom: 5px; }
 
-  .dl-btn {
-    width: 100%; padding: 14px;
+  /* ── Resolution download buttons ────────────────────────── */
+  .res-buttons {
+    display: flex; flex-direction: column; gap: 10px; margin-bottom: 10px;
+  }
+  .res-buttons.hidden { display: none; }
+
+  .res-btn {
+    display: flex; align-items: center; justify-content: space-between;
+    width: 100%; padding: 14px 20px;
     background: linear-gradient(135deg, #6c5ce7, #a78bfa);
     border: none; border-radius: 10px; color: #fff;
-    font-size: 1rem; font-weight: 600; cursor: pointer;
+    font-size: .95rem; font-weight: 600; cursor: pointer;
     transition: transform .15s, box-shadow .15s;
   }
-  .dl-btn:hover { transform: translateY(-2px); box-shadow: 0 8px 24px rgba(108,92,231,.4); }
-  .dl-btn:disabled { opacity: .5; cursor: wait; transform: none; box-shadow: none; }
+  .res-btn:hover { transform: translateY(-2px); box-shadow: 0 8px 24px rgba(108,92,231,.4); }
+  .res-btn:disabled { opacity: .5; cursor: wait; transform: none; box-shadow: none; }
+  .res-btn .res-label { font-size: 1.05rem; }
+  .res-btn .res-meta {
+    font-size: .78rem; color: rgba(255,255,255,.7); text-align: right;
+    line-height: 1.4;
+  }
+
+  /* ── Big downloads button ──────────────────────────────── */
+  .big-downloads-btn {
+    width: 100%; padding: 14px; margin-top: 20px;
+    background: linear-gradient(135deg, #2a2a4a, #3a3a5a);
+    border: 1px solid #4a4a6a; border-radius: 10px; color: #a78bfa;
+    font-size: 1rem; font-weight: 600; cursor: pointer;
+    transition: all .2s;
+  }
+  .big-downloads-btn:hover {
+    background: linear-gradient(135deg, #3a3a5a, #4a4a6a);
+    border-color: #6c5ce7;
+    transform: translateY(-1px);
+  }
 
   .dl-progress { margin-top: 18px; }
   .dl-status { font-size: .82rem; color: #888; margin-top: 8px; }
+
+  /* ── Probing spinner ────────────────────────────────────── */
+  .probing {
+    display: none; text-align: center; padding: 12px; color: #888;
+    font-size: .82rem;
+  }
+  .probing.visible { display: block; }
+  .probing .spinner {
+    display: inline-block; width: 16px; height: 16px;
+    border: 2px solid #2a2a4a; border-top-color: #a78bfa;
+    border-radius: 50%; animation: spin .8s linear infinite;
+    vertical-align: middle; margin-right: 8px;
+  }
+  @keyframes spin { to { transform: rotate(360deg); } }
 
   /* ── Error notification ─────────────────────────────────── */
   .error-toast {
@@ -153,6 +208,14 @@
   .footer {
     margin-top: 20px; font-size: .72rem; color: #444; text-align: center;
   }
+
+  /* ── Video title shown after probe ──────────────────────── */
+  .video-title {
+    display: none; font-size: .85rem; color: #ccc; margin-bottom: 12px;
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+    max-width: 100%;
+  }
+  .video-title.visible { display: block; }
 
   /* ── Transitions ────────────────────────────────────────── */
   .fade-in { animation: fadeIn .4s ease; }
@@ -189,19 +252,24 @@
   <!-- DOWNLOAD SCREEN                                        -->
   <!-- ═══════════════════════════════════════════════════════ -->
   <div class="download-screen" id="downloadScreen">
-    <div style="display:flex; justify-content:space-between; align-items:flex-start;">
-      <div>
-        <h1>🎬 Video Downloader</h1>
-        <p class="subtitle">Скачай видео с YouTube, Twitter/X, TikTok, Instagram, Facebook, LinkedIn и 1000+ сайтов</p>
-      </div>
-      <button onclick="openFolder()" style="background:none; border:1px solid #2a2a4a; border-radius:8px; padding:6px 10px; color:#888; cursor:pointer; font-size:.75rem; transition:all .2s; margin-left:12px; flex-shrink:0;" title="Открыть папку загрузок">📁 Загрузки</button>
-    </div>
+    <h1>🎬 Video Downloader</h1>
+    <p class="subtitle">Скачай видео с YouTube, Twitter/X, TikTok, Instagram, Facebook, LinkedIn и 1000+ сайтов</p>
 
     <label>Ссылка на видео</label>
-    <input type="url" id="url" placeholder="https://youtube.com/watch?v=…" autocomplete="off" autofocus>
+    <div class="url-input-row">
+      <input type="url" id="urlInput" placeholder="Вставь ссылку на видео…" autocomplete="off" autofocus>
+      <button class="clear-btn" onclick="clearUrl()" title="Очистить">✕</button>
+    </div>
     <div class="platform-badge" id="badge">…</div>
 
-    <div class="options">
+    <div class="probing" id="probing">
+      <span class="spinner"></span> Определяю доступные форматы…
+    </div>
+
+    <div class="video-title" id="videoTitle"></div>
+
+    <!-- Mode toggle: only visible after successful probe -->
+    <div class="options hidden" id="modeRow">
       <div class="opt-btn active" id="optVideo" onclick="setMode('video')">
         <span class="icon">🎥</span>Видео (MP4)
       </div>
@@ -210,7 +278,16 @@
       </div>
     </div>
 
-    <button class="dl-btn" id="dlBtn" onclick="download()">⬇️ Скачать</button>
+    <!-- Resolution buttons: dynamically generated -->
+    <div class="res-buttons hidden" id="resButtons"></div>
+
+    <!-- Audio download button: shown when mode=audio after probe -->
+    <div class="res-buttons hidden" id="audioButtons">
+      <button class="res-btn" id="audioDlBtn" onclick="downloadAudio()">
+        <span class="res-label">🎵 Скачать MP3</span>
+        <span class="res-meta">Аудио</span>
+      </button>
+    </div>
 
     <div class="dl-progress" id="dlProgress" style="display:none">
       <div class="progress-bg"><div class="progress-bar" id="dlBar"></div></div>
@@ -222,13 +299,16 @@
       </div>
     </div>
 
+    <!-- Big Downloads button at bottom -->
+    <button class="big-downloads-btn" onclick="openFolder()">📁 Загрузки</button>
+
     <p class="footer">Готово к работе ✅</p>
   </div>
 
 </div>
 
 <script>
-/* ── Platform detect ─────────────────────────────────────── */
+/* ── Constants ───────────────────────────────────────────── */
 const PLATS = [
   { name:'youtube',   hosts:['youtube.com','youtu.be'] },
   { name:'twitter',   hosts:['twitter.com','x.com'] },
@@ -242,11 +322,21 @@ const PLAT_CLS = { youtube:'platform-youtube', twitter:'platform-twitter', tikto
 const PLAT_LBL = { youtube:'🔴 YouTube', twitter:'🐦 Twitter/X', tiktok:'🎵 TikTok',
   instagram:'📸 Instagram', facebook:'📘 Facebook', linkedin:'💼 LinkedIn', other:'🌐 Другое' };
 
+/* ── Helpers ─────────────────────────────────────────────── */
+function _human(n) {
+  if (!n) return '?';
+  const u = ['B','KB','MB','GB'];
+  for (const s of u) { if (n < 1024) return n.toFixed(1) + ' ' + s; n /= 1024; }
+  return n.toFixed(1) + ' TB';
+}
+
+/* ── Platform detect ─────────────────────────────────────── */
 function detectPlatform(url) {
   const u = url.toLowerCase();
   for (const p of PLATS) for (const h of p.hosts) if (u.includes(h)) return p.name;
   return 'other';
 }
+
 function updateBadge(url) {
   const b = document.getElementById('badge');
   if (!url) { b.classList.remove('visible'); return; }
@@ -254,31 +344,187 @@ function updateBadge(url) {
   b.textContent = 'Платформа: ' + (PLAT_LBL[p] || p);
   b.className = 'platform-badge visible ' + (PLAT_CLS[p] || '');
 }
-document.getElementById('url').addEventListener('input', e => updateBadge(e.target.value));
-document.getElementById('url').addEventListener('paste', () =>
-  setTimeout(() => updateBadge(document.getElementById('url').value), 50));
 
-/* ── Mode ─────────────────────────────────────────────────── */
+/* ── URL validation ──────────────────────────────────────── */
+function isValidUrl(url) {
+  try { const u = new URL(url); return u.protocol === 'http:' || u.protocol === 'https:'; }
+  catch { return false; }
+}
+
+/* ── State ───────────────────────────────────────────────── */
 let mode = 'video';
+let probedFormats = [];
+let probedTitle = '';
+let probeAbort = null;
+
+/* ── Mode toggle ─────────────────────────────────────────── */
 function setMode(m) {
   mode = m;
   document.getElementById('optVideo').classList.toggle('active', m === 'video');
   document.getElementById('optAudio').classList.toggle('active', m === 'audio');
+  renderResButtons();
+}
+
+/* ── Probe URL → fetch formats ───────────────────────────── */
+let probeTimer = null;
+
+function scheduleProbe(url) {
+  clearTimeout(probeTimer);
+  if (probeAbort) { probeAbort.abort(); probeAbort = null; }
+  hideProbing();
+  hideResButtons();
+  probedFormats = [];
+  // Debounce 400ms
+  probeTimer = setTimeout(() => doProbe(url), 400);
+}
+
+function doProbe(url) {
+  if (!isValidUrl(url)) return;
+  showProbing();
+  probeAbort = new AbortController();
+  fetch('/probe?url=' + encodeURIComponent(url), { signal: probeAbort.signal })
+    .then(r => r.json())
+    .then(data => {
+      hideProbing();
+      probeAbort = null;
+      if (data.error) {
+        showError('Ошибка', data.error);
+        return;
+      }
+      probedFormats = data.formats || [];
+      probedTitle = data.title || '';
+      document.getElementById('videoTitle').textContent = '📹 ' + probedTitle;
+      document.getElementById('videoTitle').classList.add('visible');
+      document.getElementById('modeRow').classList.remove('hidden');
+      renderResButtons();
+    })
+    .catch(err => {
+      hideProbing();
+      probeAbort = null;
+      if (err.name !== 'AbortError') {
+        showError('Ошибка', 'Не удалось проверить ссылку');
+      }
+    });
+}
+
+function showProbing() { document.getElementById('probing').classList.add('visible'); }
+function hideProbing() { document.getElementById('probing').classList.remove('visible'); }
+
+/* ── Render resolution buttons based on probed formats ──── */
+function renderResButtons() {
+  if (mode === 'audio') {
+    document.getElementById('resButtons').classList.add('hidden');
+    document.getElementById('audioButtons').classList.remove('hidden');
+    return;
+  }
+  document.getElementById('audioButtons').classList.add('hidden');
+  const container = document.getElementById('resButtons');
+  if (!probedFormats.length) {
+    container.classList.add('hidden');
+    return;
+  }
+  container.innerHTML = '';
+
+  // Pick resolutions to show based on available max height
+  const maxH = probedFormats.length ? probedFormats[0].height : 0;
+  let targets = [];
+  if (maxH >= 2160) {
+    targets = [2160, 1440, 1080];
+  } else if (maxH >= 1440) {
+    targets = [1440, 1080];
+  } else {
+    // Show the two best resolutions (or one if only one)
+    const unique = [...new Set(probedFormats.map(f => f.height))];
+    targets = unique.slice(0, 2);
+  }
+
+  // For each target, find the closest format >= target height
+  for (const tgt of targets) {
+    // Find best format at or below target
+    let best = null;
+    for (const f of probedFormats) {
+      // exact match is best
+      if (f.height === tgt) { best = f; break; }
+      // closest below
+      if (f.height <= tgt && (!best || f.height > best.height)) {
+        best = f;
+      }
+    }
+    if (!best) continue;
+    const btn = document.createElement('button');
+    btn.className = 'res-btn';
+    const resLabel = best.height >= 2160 ? '4K' : best.height >= 1440 ? '2K' : best.height + 'p';
+    const sizeStr = best.filesize ? _human(best.filesize) : '~';
+    btn.innerHTML = `<span class="res-label">${resLabel}</span><span class="res-meta">${sizeStr} · ${best.ext.toUpperCase()}</span>`;
+    btn.onclick = () => startDownload(best.format_id, best.height);
+    container.appendChild(btn);
+  }
+
+  container.classList.remove('hidden');
+}
+
+function hideResButtons() {
+  document.getElementById('resButtons').classList.add('hidden');
+  document.getElementById('audioButtons').classList.add('hidden');
+  document.getElementById('modeRow').classList.add('hidden');
+  document.getElementById('videoTitle').classList.remove('visible');
+}
+
+/* ── URL input handlers ──────────────────────────────────── */
+const urlInput = document.getElementById('urlInput');
+urlInput.addEventListener('input', e => {
+  const url = e.target.value.trim();
+  updateBadge(url);
+  if (!url) {
+    urlInput.classList.remove('valid', 'invalid');
+    hideResButtons();
+    clearTimeout(probeTimer);
+    return;
+  }
+  if (isValidUrl(url)) {
+    urlInput.classList.add('valid');
+    urlInput.classList.remove('invalid');
+    scheduleProbe(url);
+  } else {
+    urlInput.classList.add('invalid');
+    urlInput.classList.remove('valid');
+    hideResButtons();
+    clearTimeout(probeTimer);
+  }
+});
+urlInput.addEventListener('paste', () =>
+  setTimeout(() => updateBadge(urlInput.value.trim()), 50));
+
+function clearUrl() {
+  urlInput.value = '';
+  urlInput.classList.remove('valid', 'invalid');
+  hideResButtons();
+  hideError();
+  document.getElementById('badge').classList.remove('visible');
+  clearTimeout(probeTimer);
+  urlInput.focus();
 }
 
 /* ── Bootstrap: check if setup already done ────────────────── */
-fetch('/status').then(r => r.json()).then(d => {
-  if (d.setup_done || d.phase === 'silent_check' || d.phase === 'checking') {
-    // Already configured or being checked — skip setup, show download screen
-    document.getElementById('setupScreen').style.display = 'none';
-    document.getElementById('downloadScreen').style.display = 'block';
-    document.getElementById('downloadScreen').classList.add('fade-in');
-  }
-}).catch(() => {});
-
-/* ── Setup wizard ─────────────────────────────────────────── */
 let setupPoll = null;
 
+fetch('/status').then(r => r.json()).then(d => {
+  const setupScreen = document.getElementById('setupScreen');
+  const downloadScreen = document.getElementById('downloadScreen');
+  if (d.setup_done || d.phase === 'silent_check' || d.phase === 'checking') {
+    setupScreen.classList.remove('active');
+    downloadScreen.style.display = 'block';
+    downloadScreen.classList.add('fade-in');
+  } else {
+    setupScreen.classList.add('active');
+    downloadScreen.style.display = 'none';
+  }
+}).catch(() => {
+  setupScreen.classList.add('active');
+  downloadScreen.style.display = 'none';
+});
+
+/* ── Setup wizard ─────────────────────────────────────────── */
 function startSetup() {
   const btn = document.getElementById('setupBtn');
   btn.disabled = true;
@@ -287,12 +533,10 @@ function startSetup() {
   document.getElementById('setupProgress').style.display = 'block';
   document.getElementById('setupProgress').classList.add('fade-in');
 
-  // Start setup on server
   fetch('/setup', { method: 'POST' }).then(r => r.json()).then(data => {
     if (data.already_done) {
-      // Server says we're done — go straight to download
       clearInterval(setupPoll);
-      document.getElementById('setupScreen').style.display = 'none';
+      document.getElementById('setupScreen').classList.remove('active');
       document.getElementById('downloadScreen').style.display = 'block';
       document.getElementById('downloadScreen').classList.add('fade-in');
       return;
@@ -310,7 +554,6 @@ function pollSetup() {
     document.getElementById('setupBar').style.width = (d.progress || 0) + '%';
     document.getElementById('setupPct').textContent = (d.progress || 0) + '%';
 
-    // Phase labels
     const PHASE_LABELS = {
       idle: '⏳ Ожидание…',
       checking: '🔍 Проверяю зависимости…',
@@ -322,7 +565,6 @@ function pollSetup() {
     };
     document.getElementById('setupStatus').textContent = PHASE_LABELS[d.phase] || d.phase;
 
-    // Update status text from messages (last message only)
     if (d.messages && d.messages.length > 0) {
       const last = d.messages[d.messages.length - 1];
       if (last.text && !last.text.startsWith('✅') && !last.text.startsWith('❌')) {
@@ -334,7 +576,7 @@ function pollSetup() {
       clearInterval(setupPoll);
       document.getElementById('setupStatus').textContent = '✅ Всё готово! Открываю…';
       setTimeout(() => {
-        document.getElementById('setupScreen').style.display = 'none';
+        document.getElementById('setupScreen').classList.remove('active');
         document.getElementById('downloadScreen').style.display = 'block';
         document.getElementById('downloadScreen').classList.add('fade-in');
       }, 1200);
@@ -366,10 +608,19 @@ function hideError() {
   document.getElementById('errorToast').classList.remove('visible');
 }
 
-function download() {
-  const url = document.getElementById('url').value.trim();
-  if (!url) { showError('Введи ссылку', 'Пожалуйста, вставь ссылку на видео'); return; }
+function downloadAudio() {
+  const url = document.getElementById('urlInput').value.trim();
+  if (!url) return;
+  _startDownload(url, 'audio');
+}
 
+function startDownload(formatId, height) {
+  const url = document.getElementById('urlInput').value.trim();
+  if (!url) return;
+  _startDownload(url, 'video', formatId, height);
+}
+
+function _startDownload(url, dlMode, formatId, height) {
   document.getElementById('dlProgress').style.display = 'block';
   document.getElementById('dlProgress').classList.add('fade-in');
   hideError();
@@ -378,43 +629,41 @@ function download() {
   dlBar.classList.remove('done');
   document.getElementById('dlStatus').textContent = 'Запуск…';
 
-  const btn = document.getElementById('dlBtn');
-  btn.disabled = true; btn.textContent = '⏳ Скачивание…';
+  // Disable resolution buttons
+  document.querySelectorAll('.res-btn, .big-downloads-btn').forEach(b => b.disabled = true);
 
   fetch('/download', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ url, mode })
+    body: JSON.stringify({ url: url, mode: dlMode, format_id: formatId || '' })
   })
   .then(r => r.json())
   .then(data => {
     if (data.error) {
       showError('Ошибка', data.error);
-      btn.disabled = false; btn.textContent = '⬇️ Скачать';
+      enableDlButtons();
       return;
     }
-    // Server is still checking deps — retry after a short delay
     if (data.deps_ready) {
       document.getElementById('dlStatus').textContent = '✅ Зависимости готовы, запуск…';
       setTimeout(() => {
-        btn.disabled = false;
-        download();
+        enableDlButtons();
+        _startDownload(url, dlMode, formatId, height);
       }, 500);
       return;
     }
-    document.getElementById('dlStatus').textContent = `📦 ${data.platform} — скачивание…`;
+    const label = (dlMode === 'audio') ? 'Аудио (MP3)' : (height ? height + 'p' : 'Видео');
+    document.getElementById('dlStatus').textContent = `📦 ${data.platform} — скачивание ${label}…`;
     let offset = 0;
     dlPoll = setInterval(() => {
       fetch('/log?job=' + data.job_id + '&offset=' + offset)
         .then(r => r.json())
         .then(d => {
           if (d.lines) {
-            // Show last line as status
             const last = d.lines[d.lines.length - 1];
             if (last && !last.startsWith('[yt-dlp]') && !last.startsWith('[cmd]')) {
               document.getElementById('dlStatus').textContent = last;
             }
-            // If there's an error in logs, show toast
             d.lines.forEach(l => {
               if (l.includes('[error]') || l.includes('ERROR') || l.includes('Error')) {
                 showError('Ошибка загрузки', l);
@@ -429,7 +678,7 @@ function download() {
             if (d.status === 'done') {
               document.getElementById('dlStatus').textContent = '✅ Готово!';
             }
-            btn.disabled = false; btn.textContent = '⬇️ Скачать';
+            enableDlButtons();
           } else {
             const bar = document.getElementById('dlBar');
             const cur = parseFloat(bar.style.width);
@@ -440,8 +689,12 @@ function download() {
   })
   .catch(err => {
     showError('Ошибка соединения', err.message);
-    btn.disabled = false; btn.textContent = '⬇️ Скачать';
+    enableDlButtons();
   });
+}
+
+function enableDlButtons() {
+  document.querySelectorAll('.res-btn, .big-downloads-btn').forEach(b => b.disabled = false);
 }
 
 </script>
