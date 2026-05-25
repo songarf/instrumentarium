@@ -940,7 +940,9 @@ class JobLogger(threading.Thread):
                     "[warn] ffmpeg not found — video quality may be limited. "
                     "Install ffmpeg and restart for full quality." )
 
-        out_tmpl = os.path.join(out_dir, "%(title)s [%(id)s].%(ext)s")
+        # Limit filename length to avoid OS errors on long titles (LinkedIn etc)
+        # Windows MAX_PATH is 260, leave room for extension and folder path
+        out_tmpl = os.path.join(out_dir, "%(title).120s [%(id)s].%(ext)s")
         cmd = [self.yt, "-f", fmt, *post, "-o", out_tmpl,
                "--no-playlist", "--retries", "3",
                "--newline", "--progress", self.url]
