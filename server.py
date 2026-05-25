@@ -610,11 +610,27 @@ class Handler(http.server.BaseHTTPRequestHandler):
                 cmd = [yt, "--dump-single-json", "--no-download", "--no-playlist", "--no-check-certificates", url]
                 log.info("/probe: cmd=%s", " ".join(cmd))
                 proc = _popen(cmd)
-                stdout_data, _ = proc.communicate(timeout=30)
-                if proc.returncode != 0:
-                    self._json({"error": "Failed to probe video", "details": stdout_data[:500]})
+                try:
+                    stdout_data, _ = proc.communicate(timeout=30)
+                except subprocess.TimeoutExpired:
+                    proc.kill()
+                    self._json({"error": "Probe timed out (30s)"})
                     return
-                data = json.loads(stdout_data)
+                if proc.returncode != 0:
+                    err_text = stdout_data[:500] if stdout_data else "(no output)"
+                    log.warning("/probe: yt-dlp exit=%d output=%s", proc.returncode, err_text)
+                    self._json({"error": "Failed to probe video", "details": err_text})
+                    return
+                if not stdout_data or not stdout_data.strip():
+                    self._json({"error": "Empty response from yt-dlp"})
+                    return
+                # yt-dlp may output warnings to stderr (which we merge into stdout).
+                # Find the actual JSON object starting with '{'.
+                json_start = stdout_data.find('{')
+                if json_start < 0:
+                    self._json({"error": "No JSON in yt-dlp output", "details": stdout_data[:300]})
+                    return
+                data = json.loads(stdout_data[json_start:])
                 # Extract relevant format info
                 title = data.get("title", "Unknown")
                 duration = data.get("duration", 0)
@@ -656,9 +672,6 @@ class Handler(http.server.BaseHTTPRequestHandler):
                     "formats": unique_formats,
                 })
                 log.info("/probe: found %d unique resolutions for '%s'", len(unique_formats), title)
-            except subprocess.TimeoutExpired:
-                proc.kill()
-                self._json({"error": "Probe timed out"})
             except Exception as e:
                 log.error("/probe: exception: %s", e, exc_info=True)
                 self._json({"error": str(e)})
@@ -951,7 +964,7 @@ if __name__ == "__main__":
     _safe_print(f"   URL: http://localhost:{PORT}")
     _safe_print(f"   Output: {OUTPUT_BASE}/<platform>/")
     _safe_print()
-
+    _safe_print()
     srv = http.server.HTTPServer(("0.0.0.0", PORT), Handler)
     try:
         srv.serve_forever()

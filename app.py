@@ -135,7 +135,7 @@ def _start_server_in_thread():
 
         log.info("Creating HTTP server on 0.0.0.0:%d...", 18765)
         srv.srv = srv.http.server.HTTPServer(("0.0.0.0", srv.PORT), srv.Handler)
-        # Short timeout so serve_forever() checks for shutdown frequently
+        srv.srv.allow_reuse_address = True
         srv.srv.timeout = 0.5
         log.info("HTTP server created, calling serve_forever()...")
         srv.srv.serve_forever()
