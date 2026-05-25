@@ -684,7 +684,9 @@ class Handler(http.server.BaseHTTPRequestHandler):
                         eff_height = 0
                     # Parse resolution label from format_note (e.g. "1080p", "720p")
                     # or fall back to eff_height
-                    if format_note:
+                    # Parse resolution label from format_note (e.g. "1080p", "720p")
+                    # Skip non-informative notes like "DASH video", "DASH audio"
+                    if format_note and "DASH" not in format_note.upper():
                         res_label = format_note
                     elif eff_height > 0:
                         res_label = f"{eff_height}p"
