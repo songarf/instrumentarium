@@ -663,14 +663,17 @@ class JobLogger(threading.Thread):
                 j["log"].append("[warn] ffmpeg not found — audio extraction may fail")
         else:
             if ffmpeg_ok:
-                # Don't restrict bestvideo to mp4 — for Shorts and some videos
-                # the best video is webm/VP9/AV1. yt-dlp will merge + remux to mp4
-                # via ffmpeg (--merge-output-format + --ffmpeg-location below).
+                # With ffmpeg: best video + best audio, merge to mp4.
+                # No container restriction on bestvideo — Shorts have better
+                # streams in webm/VP9/AV1; ffmpeg will remux to mp4.
                 fmt = "bestvideo+bestaudio/best"
-                post = ["--merge-output-format", "mp4"]
+                post = ["--merge-output-format", "mp4", "--recode-video", "mp4"]
             else:
-                # Without ffmpeg: try combined file first, then single-stream mp4
-                fmt = "best[ext=mp4]/best"
+                # Without ffmpeg: we can't merge separate streams, so we need
+                # a single-file format. For YouTube Shorts the combined mp4 is
+                # often only 360p, so try bestaudio+bestvideo in DASH mp4 first,
+                # then fall back to best combined.
+                fmt = "bestvideo[ext=mp4]+bestaudio[ext=m4a]/best[ext=mp4]/best"
                 post = []
                 j["log"].append("[warn] ffmpeg not found — downloading single-file format")
 
