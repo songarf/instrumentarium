@@ -649,6 +649,7 @@ class Handler(http.server.BaseHTTPRequestHandler):
                     video_ext = f.get("video_ext") or "none"
                     audio_ext = f.get("audio_ext") or "none"
                     format_note = f.get("format_note", "")
+                    format_id = f.get("format_id", "")
                     # Skip audio-only formats. Detect video by vcodec or video_ext.
                     # LinkedIn returns vcodec=None but video_ext=mp4 for video formats.
                     is_video = (vcodec != "none" and vcodec is not None) or (video_ext != "none" and video_ext is not None)
@@ -690,6 +691,8 @@ class Handler(http.server.BaseHTTPRequestHandler):
                         res_label = format_note
                     elif eff_height > 0:
                         res_label = f"{eff_height}p"
+                    elif format_id:
+                        res_label = format_id.upper()
                     elif video_ext and video_ext != "none":
                         res_label = "Скачать видео"
                     else:
