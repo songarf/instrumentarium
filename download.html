@@ -142,7 +142,12 @@
   .opt-btn.active { border-color: #6c5ce7; background: #1a1040; color: #a78bfa; }
   .opt-btn .icon { font-size: 1.5rem; display: block; margin-bottom: 5px; }
 
-  /* ── Resolution download buttons ────────────────────────── */
+  /* ── Download buttons container (video res / audio) ──────── */
+  .dl-options {
+    min-height: 170px;  /* Reserve space for up to 3 buttons so layout doesn't jump */
+  }
+
+  /* ── Resolution / audio download buttons ─────────────────── */
   .res-buttons {
     display: flex; flex-direction: column; gap: 10px; margin-bottom: 10px;
   }
@@ -278,15 +283,10 @@
       </div>
     </div>
 
-    <!-- Resolution buttons: dynamically generated -->
-    <div class="res-buttons hidden" id="resButtons"></div>
-
-    <!-- Audio download button: shown when mode=audio after probe -->
-    <div class="res-buttons hidden" id="audioButtons">
-      <button class="res-btn" id="audioDlBtn" onclick="downloadAudio()">
-        <span class="res-label">🎵 Скачать MP3</span>
-        <span class="res-meta">Аудио</span>
-      </button>
+    <!-- Download buttons container: fixed height to prevent layout shift -->
+    <div class="dl-options" id="dlOptions">
+      <div class="res-buttons" id="resButtons"></div>
+      <div class="res-buttons" id="audioButtons"></div>
     </div>
 
     <div class="dl-progress" id="dlProgress" style="display:none">
@@ -354,6 +354,7 @@ function isValidUrl(url) {
 /* ── State ───────────────────────────────────────────────── */
 let mode = 'video';
 let probedFormats = [];
+let probedAudioFormats = [];
 let probedTitle = '';
 let probeAbort = null;
 
@@ -392,6 +393,7 @@ function doProbe(url) {
         return;
       }
       probedFormats = data.formats || [];
+      probedAudioFormats = data.audio_formats || [];
       probedTitle = data.title || '';
       document.getElementById('videoTitle').textContent = '📹 ' + probedTitle;
       document.getElementById('videoTitle').classList.add('visible');
@@ -412,12 +414,27 @@ function hideProbing() { document.getElementById('probing').classList.remove('vi
 
 /* ── Render resolution buttons based on probed formats ──── */
 function renderResButtons() {
+  const resContainer = document.getElementById('resButtons');
+  const audioContainer = document.getElementById('audioButtons');
   if (mode === 'audio') {
-    document.getElementById('resButtons').classList.add('hidden');
-    document.getElementById('audioButtons').classList.remove('hidden');
+    resContainer.innerHTML = '';
+    audioContainer.innerHTML = '';
+    if (!probedAudioFormats || !probedAudioFormats.length) {
+      return;
+    }
+    for (const af of probedAudioFormats) {
+      const btn = document.createElement('button');
+      btn.className = 'res-btn';
+      const abrStr = af.abr > 0 ? `${Math.round(af.abr)}kbps` : '';
+      const sizeStr = af.filesize ? _human(af.filesize) : '~';
+      btn.innerHTML = `<span class="res-label">${abrStr}</span><span class="res-meta">${sizeStr} · ${af.ext.toUpperCase()}</span>`;
+      btn.onclick = () => startDownloadAudio(af.format_id);
+      audioContainer.appendChild(btn);
+    }
     return;
   }
-  document.getElementById('audioButtons').classList.add('hidden');
+  // video mode
+  audioContainer.innerHTML = '';
   const container = document.getElementById('resButtons');
   if (!probedFormats.length) {
     container.classList.add('hidden');
@@ -428,7 +445,7 @@ function renderResButtons() {
   // Determine which resolution buttons to show based on effective height
   // For vertical videos, eff_height = width (e.g. 1080 for 1080x1920)
   // We treat 1080 eff_height as "1080p" vertical = show single button
-  const maxH = uniqueFormats.length ? uniqueFormats[0].height : 0;
+  const maxH = probedFormats.length ? probedFormats[0].height : 0;
   let targets = [];
   if (maxH >= 2160) {
     targets = [2160, 1440, 1080];  // 4K horizontal
@@ -436,7 +453,7 @@ function renderResButtons() {
     targets = [1440, 1080];        // 2K horizontal
   } else {
     // For vertical video (maxH ~1080) or low-res horizontal: show top 2 unique
-    const unique = [...new Set(uniqueFormats.map(f => f.height))];
+    const unique = [...new Set(probedFormats.map(f => f.height))];
     targets = unique.slice(0, 2);
   }
 
@@ -610,10 +627,10 @@ function hideError() {
   document.getElementById('errorToast').classList.remove('visible');
 }
 
-function downloadAudio() {
+function startDownloadAudio(audioFormatId) {
   const url = document.getElementById('urlInput').value.trim();
   if (!url) return;
-  _startDownload(url, 'audio');
+  _startDownload(url, 'audio', audioFormatId || '');
 }
 
 function startDownload(formatId, height) {

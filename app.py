@@ -184,9 +184,8 @@ try:
         "Instrumentarium",
         url="http://localhost:18765",
         width=620,
-        height=700,
-        resizable=True,
-        min_size=(540, 500),
+        height=720,
+        resizable=False,
     )
 
     if window:

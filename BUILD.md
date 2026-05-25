@@ -12,10 +12,11 @@
 4. [Потоки (Threads)](#4-потоки-threads)
 5. [HTTP API](#5-http-api)
 6. [Рабочие файлы](#6-рабочие-файлы)
-7. [Сборка (PyInstaller)](#7-сборка-pyinstaller)
-8. [CI/CD](#8-cicd)
-9. [Тестирование](#9-тестирование)
-10. [Известные ограничения и планы](#10-известные-ограничения-и-планы)
+7. [Форматы видео/аудио](#7-форматы-видеоаудио)
+8. [Сборка (PyInstaller)](#8-сборка-pyinstaller)
+9. [CI/CD](#9-cicd)
+10. [Тестирование](#10-тестирование)
+11. [Известные ограничения и планы](#11-известные-ограничения-и-планы)
 
 ---
 
@@ -30,6 +31,7 @@
 **Технологический стек:**
 - Python 3.7+ (встроенный в билд)
 - yt-dlp (скачивается автоматически при первом запуске)
+- ffmpeg (скачивается автоматически на Windows)
 - pywebview (нативное окно с HTML/CSS/JS UI)
 - cefpython3 (Chromium Embedded Framework — fallback для Windows без WebView2)
 - PyInstaller (сборка в standalone-бинарь)
@@ -70,7 +72,9 @@ instrumentarium/
 ├── .setup_done                 # Маркёр завершённой настройки (timestamp)
 ├── .instrumentarium.lock       # Lock-файл для единственного инстанса
 ├── .bin/                       # Скачанные бинарники
-│   └── yt-dlp.exe              # (Windows) или yt-dlp (Linux/macOS)
+│   ├── yt-dlp.exe              # (Windows) или yt-dlp (Linux/macOS)
+│   ├── ffmpeg.exe              # (Windows, скачивается автоматически)
+│   └── ffprobe.exe             # (Windows, скачивается автоматически)
 └── downloads/                  # Скачанные видео
     ├── youtube/
     ├── twitter/
@@ -117,6 +121,7 @@ app.py (main thread)
   ├── 6. Ожидание готовности сервера (max 5s, polling 127.0.0.1:18765)
   │
   └── 7. Открытие окна pywebview:
+          Размер: 620×720, resizable=False
           Windows: edgechromium → cef → auto-detect
           Linux:   auto-detect (GTK/Qt)
           macOS:   auto-detect (Cocoa)
@@ -138,7 +143,7 @@ server.py (импортируется как модуль из app.py)
   │
   ├── setup_state (глобальный dict, shared между потоками):
   │     phase: idle | checking | silent_check | installing_python |
-  │             installing_ytdlp | done | error
+  │             installing_ytdlp | installing_ffmpeg | done | error
   │     progress: 0-100
   │     messages: [{text, type, time}]
   │     python_ok, ytdlp_ok, server_started, error
@@ -149,6 +154,7 @@ server.py (импортируется как модуль из app.py)
   ├── HTTP Handler:
   │     GET  /              → download.html
   │     GET  /status        → JSON setup_state
+  │     GET  /probe?url=    → JSON {title, formats, audio_formats}
   │     GET  /log?job=&offset= → JSON {lines, status}
   │     GET  /open-folder   → открыть папку downloads в файловом менеджере
   │     POST /setup         → запустить setup wizard
@@ -159,64 +165,27 @@ server.py (импортируется как модуль из app.py)
   │     run_setup() — полный wizard (первый запуск):
   │       1. find_system_python()
   │       2. check_ytdlp() / install_ytdlp()
-  │       3. _write_marker()
+  │       3. install_ffmpeg() (best-effort)
+  │       4. _write_marker()
   │
   │     _ensure_deps() — тихая проверка (повторный запуск):
   │       1. find_system_python()
   │       2. check_ytdlp() / install_ytdlp()
-  │       3. _write_marker()
-  │       4. phase = "done"
+  │       3. install_ffmpeg() (best-effort)
+  │       4. _write_marker()
   │
-  └── Download:
-        JobLogger (daemon thread):
-          1. Найти yt-dlp в _BIN_CANDIDATES
-          2. Найти ffmpeg (_find_ffmpeg)
-          3. Сформировать cmd с форматами
-          4. _popen(cmd) → _active_proc[0] = proc
-          5. proc.communicate(timeout=600) — ждать завершения
-          6. Парсить stdout → download_jobs[jid]
-          7. finally: _active_proc[0] = None
-```
-
-### 3.3. UI: download.html
-
-Одностраничный HTML с двумя экранами:
-
-**Setup screen** (показывается при первом запуске):
-- Кнопка "🚀 Настроить и запустить"
-- Прогресс-бар с shimmer-анимацией
-- После завершения → переключение на Download screen
-
-**Download screen** (показывается всегда после настройки):
-- Заголовок "🎬 Video Downloader"
-- Поле ввода URL с auto-detect платформы
-- Бейдж платформы (🔴 YouTube, 🐦 Twitter/X, 🎵 TikTok, 📸 Instagram, 📘 Facebook, 💼 LinkedIn, 🌐 Другое)
-- Переключатель 🎥 Видео (MP4) / 🎵 Аудио (MP3)
-- Кнопка "⬇️ Скачать"
-- Прогресс-бар: shimmer во время загрузки, зелёный `.done` при завершении
-- Toast для ошибок (❌ + описание + hint)
-- Кнопка "📁 Загрузки" (правый верхний угол) → `GET /open-folder`
-
-**Bootstrap-логика (выполняется при загрузке HTML):**
-```javascript
-fetch('/status').then(d => {
-  if (d.setup_done || d.phase === 'silent_check' || d.phase === 'checking') {
-    showDownloadScreen();
-  }
-  // Иначе показать setup screen (первый запуск)
-});
-```
-
-**CSS класс `.done` для progress-bar:**
-```css
-.progress-bar {
-  animation: shimmer 1.5s linear infinite;
-  background: linear-gradient(90deg, #6c5ce7, #a78bfa, #6c5ce7);
-}
-.progress-bar.done {
-  animation: none;
-  background: #4caf50;
-}
+  ├── Probe flow (/probe):
+  │     yt-dlp --dump-single-json → parse formats:
+  │       - is_video: (vcodec != "none" and vcodec is not None) or
+  │                   (video_ext != "none" and video_ext is not None)
+  │       - eff_height: width for vertical, height for horizontal
+  │       - Дедупликация по стандартным бакетам
+  │       - audio_formats: дедупликация по битрейту
+  │
+  └── Download flow (JobLogger):
+        - Video: format_id+bestaudio/best → --merge-output-format mp4
+        - Audio: bestaudio[ext=m4a]/bestaudio → --extract-audio → mp3
+        - Если ffmpeg: --recode-video mp4, --embed-metadata, --embed-thumbnail
 ```
 
 ---
@@ -232,7 +201,7 @@ Server Thread (daemon, app.py → _start_server_in_thread)
         └── Handler.do_GET/do_POST (вызывается из HTTP-потока сервера)
 
 Setup Thread (daemon, server.py → run_setup или _ensure_deps)
-  └── Проверка/установка Python, yt-dlp
+  └── Проверка/установка Python, yt-dlp, ffmpeg
 
 Download Thread (daemon, server.py → JobLogger)
   └── subprocess.Popen(yt-dlp) → proc.communicate() → parse stdout
@@ -254,7 +223,7 @@ Download Thread (daemon, server.py → JobLogger)
 ### GET /status
 ```json
 {
-  "phase": "idle|checking|silent_check|installing_python|installing_ytdlp|done|error",
+  "phase": "idle|checking|silent_check|installing_python|installing_ytdlp|installing_ffmpeg|done|error",
   "progress": 0-100,
   "messages": [{"text": "...", "type": "info|ok|err", "time": 1234567890}],
   "python_ok": true|false,
@@ -262,6 +231,23 @@ Download Thread (daemon, server.py → JobLogger)
   "server_started": true|false,
   "error": null|"error message",
   "setup_done": true|false
+}
+```
+
+### GET /probe?url=URL
+```json
+{
+  "title": "Video title",
+  "duration": 123,
+  "thumbnail": "https://...",
+  "formats": [
+    {"format_id": "137", "height": 1080, "display_label": "1080p", "filesize": 52428800, "ext": "mp4"},
+    {"format_id": "136", "height": 720, "display_label": "720p", "filesize": 20971520, "ext": "mp4"}
+  ],
+  "audio_formats": [
+    {"format_id": "140", "abr": 129.5, "filesize": 5242880, "ext": "m4a"},
+    {"format_id": "251", "abr": 126.6, "filesize": 4194304, "ext": "webm"}
+  ]
 }
 ```
 
@@ -285,7 +271,7 @@ Download Thread (daemon, server.py → JobLogger)
 ### POST /download
 ```json
 // Request body:
-{"url": "https://youtube.com/watch?v=...", "mode": "video|audio"}
+{"url": "https://youtube.com/watch?v=...", "mode": "video|audio", "format_id": "137"}
 
 // Response (success):
 {"job_id": "abc12345", "platform": "youtube"}
@@ -327,8 +313,10 @@ Download Thread (daemon, server.py → JobLogger)
 
 ### 6.4. Папка `.bin/`
 - **Расположение:** `_BASE_DIR/.bin/`
-- **Содержимое:** `yt-dlp.exe` (скачивается при первом запуске)
-- **Альтернативные пути:** `_EXE_DIR/.bin/`, `_MEIPASS/.bin/` (для PyInstaller)
+- **Содержимое:**
+  - `yt-dlp.exe` / `yt-dlp` — скачивается при первом запуске
+  - `ffmpeg.exe` — скачивается автоматически (Windows, BtbN builds)
+  - `ffprobe.exe` — скачивается автоматически (Windows, BtbN builds)
 
 ### 6.5. Папка `downloads/`
 - **Расположение:** `_BASE_DIR/downloads/`
@@ -337,9 +325,51 @@ Download Thread (daemon, server.py → JobLogger)
 
 ---
 
-## 7. Сборка (PyInstaller)
+## 7. Форматы видео/аудио
 
-### 7.1. Spec-файлы
+### 7.1. Определение видео форматов
+
+```python
+# Обрабатывает LinkedIn (vcodec=None, video_ext=mp4) и другие платформы
+is_video = (vcodec != "none" and vcodec is not None) or \
+           (video_ext != "none" and video_ext is not None)
+```
+
+### 7.2. Эффективное разрешение
+
+```python
+# Для вертикальных видео (Shorts 1080x1920):
+is_vertical = height > width
+eff_height = width if is_vertical else height  # 1080, а не 1920
+```
+
+### 7.3. Форматы скачивания
+
+```
+Видео (конкретный формат из кнопки):
+  format_id+bestaudio/best → --merge-output-format mp4
+
+Видео (авто, с ffmpeg):
+  bestvideo+bestaudio/best → --merge-output-format mp4 --recode-video mp4
+
+Видео (авто, без ffmpeg):
+  best[ext=mp4]/best
+
+Аудио:
+  bestaudio[ext=m4a]/bestaudio → --extract-audio --audio-format mp3 --audio-quality 0
+```
+
+### 7.4. Дедупликация форматов
+
+**Видео:** группировка по стандартным бакетам (144, 240, 360, 480, 720, 1080, 1440, 2160, 4320). Для каждой кнопки — ближайший формат ≤ target.
+
+**Аудио:** группировка по битрейту (шаг 16kbps). Сортировка по убыванию битрейта.
+
+---
+
+## 8. Сборка (PyInstaller)
+
+### 8.1. Spec-файлы
 
 **Windows:** `video-downloader-win.spec`
 - `console=False` (без консоли)
@@ -351,7 +381,7 @@ Download Thread (daemon, server.py → JobLogger)
 - Аналогично, но без cefpython3
 - Иконка: `assets/icon.png`
 
-### 7.2. Ключевые правила для PyInstaller one-file
+### 8.2. Ключевые правила для PyInstaller one-file
 
 1. **`sys._MEIPASS`** — путь к временной папке, куда PyInstaller извлекает файлы
 2. **`sys.executable`** — путь к .exe → `_BASE_DIR = dirname(sys.executable)`
@@ -361,7 +391,7 @@ Download Thread (daemon, server.py → JobLogger)
 6. **`CREATE_NO_WINDOW`** для всех subprocess calls на Windows
 7. **`sys.stdout = sys.stderr = open(os.devnull, 'w')`** — до любого импорта
 
-### 7.3. Команды сборки
+### 8.3. Команды сборки
 
 ```bash
 # Windows
@@ -373,7 +403,7 @@ pyinstaller video-downloader.spec --clean
 
 ---
 
-## 8. CI/CD
+## 9. CI/CD
 
 ### Workflow: `.github/workflows/build.yml`
 
@@ -405,7 +435,7 @@ release (только при теге v*)
 
 ---
 
-## 9. Тестирование
+## 10. Тестирование
 
 ```bash
 python -m pytest tests/ -v
@@ -414,7 +444,7 @@ python -m pytest tests/ -v
 **Файл:** `tests/test_server.py` — 22 теста
 
 **Что тестируется:**
-- `detect_platform()` — 10 тестов (YouTube, Twitter, TikTok, Instagram, Facebook, LinkedIn, other, case-insensitive, empty)
+- `detect_platform()` — 10 тестов (YouTube, Twitter, TikTok, Instagram, Facebook, LinkedIn, other, case-insensitive, empty URL, subdomains)
 - `_human()` — 5 тестов (bytes, KB, MB, GB, TB)
 - `find_system_python()` — 3 теста (found, not found, too old)
 - `get_python_install_url()` — 2 теста (Windows 64-bit, Linux)
@@ -425,7 +455,7 @@ python -m pytest tests/ -v
 
 ---
 
-## 10. Известные ограничения и планы
+## 11. Известные ограничения и планы
 
 ### ✅ Решено
 - Нативное окно приложения (pywebview + CEF fallback)
@@ -435,12 +465,19 @@ python -m pytest tests/ -v
 - Zombie process: /shutdown убивает активный yt-dlp subprocess
 - Glow animation: progress-bar получает класс .done при завершении
 - Кнопка 📁 Загрузки открывает папку с файловым менеджере
-- FFmpeg detection: metadata embedding только когда ffmpeg есть
+- FFmpeg auto-install (Windows, BtbN builds) + fallback без ffmpeg
 - Нет консольных окон на Windows
 - CI/CD для всех трёх платформ
 - 22 теста, все проходят
 - Single instance lock
 - Автоматическая установка yt-dlp и Python
+- LinkedIn: поддержка vcodec=None, video_ext=mp4
+- Аудио дорожка: +bestaudio/best для всех видео форматов
+- Аудио UI: битрейт (слева) + размер (справа) на кнопках
+- Фиксированный размер окна 620×720 (resizable=False)
+- Фиксированная позиция кнопки "Загрузки" (min-height: 170px на dl-options)
+- Вертикальные видео (Shorts): корректное отображение разрешения через eff_height
+- /probe endpoint: динамические кнопки форматов на основе yt-dlp
 
 ### ⬜ Планы
 - Расширить тесты: HTTP-эндпоинты, setup wizard, JobLogger
@@ -478,17 +515,6 @@ if proc and proc.poll() is None:
 _active_proc[0] = None
 ```
 
-### Форматы видео/аудио
-```
-Видео (с ffmpeg):  bestvideo[ext=mp4]+bestaudio[ext=m4a] → merge → mp4
-Видео (без ffmpeg): best[ext=mp4]/best
-Аудио:               bestaudio → extract → mp3
-```
-
-### Метаданные
-- `--embed-metadata` — встраивает метаданные в файл (ТОЛЬКО если ffmpeg есть)
-- `--embed-thumbnail` — встраивает превью (ТОЛЬКО если ffmpeg есть)
-
 ### Платформа определяется по URL
 ```
 youtube.com, youtu.be     → youtube
@@ -500,6 +526,14 @@ linkedin.com              → linkedin
 иначе                     → other
 ```
 
+### Окно приложения
+```
+Размер: 620×720 пикселей
+Resizable: False (пользователь не может менять размер)
+Рендерер: edgechromium → cef → auto-detect (Windows)
+          GTK/Qt (Linux), Cocoa (macOS)
+```
+
 ---
 
-*Последнее обновление: 2026-05-29*
+*Последнее обновление: 2026-05-30*

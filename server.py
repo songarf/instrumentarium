@@ -638,29 +638,65 @@ class Handler(http.server.BaseHTTPRequestHandler):
                 formats_raw = data.get("formats", [])
                 # Build simplified format list — only video formats with resolution
                 formats = []
+                audio_formats = []
                 for f in formats_raw:
                     width = f.get("width") or 0
                     height = f.get("height") or 0
                     ext = f.get("ext", "?")
                     filesize = f.get("filesize") or f.get("filesize_approx") or 0
-                    vcodec = f.get("vcodec", "none")
-                    acodec = f.get("acodec", "none")
+                    vcodec = f.get("vcodec") or "none"
+                    acodec = f.get("acodec") or "none"
+                    video_ext = f.get("video_ext") or "none"
+                    audio_ext = f.get("audio_ext") or "none"
                     format_note = f.get("format_note", "")
-                    # Skip audio-only for video list
-                    if vcodec == "none" or height == 0:
+                    # Skip audio-only formats. Detect video by vcodec or video_ext.
+                    # LinkedIn returns vcodec=None but video_ext=mp4 for video formats.
+                    is_video = (vcodec != "none" and vcodec is not None) or (video_ext != "none" and video_ext is not None)
+                    if not is_video:
+                        # Collect audio-only formats
+                        abr = f.get("abr") or f.get("tbr") or 0
+                        audio_filesize = f.get("filesize") or f.get("filesize_approx") or 0
+                        if abr > 0 or audio_filesize > 0:
+                            audio_formats.append({
+                                "format_id": f.get("format_id", ""),
+                                "ext": ext,
+                                "abr": round(abr, 1) if abr else 0,
+                                "filesize": audio_filesize,
+                                "acodec": acodec,
+                            })
                         continue
                     # For vertical videos (height > width), yt-dlp reports height as the
                     # long edge (e.g. 1920 for a 1080x1920 video). Use format_note for
                     # the human-readable label, and use width as the sort key since that's
                     # the actual "resolution class" for vertical content.
-                    is_vertical = height > width
+                    is_vertical = height > width if (height and width) else False
                     # Effective resolution for sorting/display:
                     # - horizontal video: use height (standard 1080p, 720p etc)
                     # - vertical video: use width (that's the real resolution class)
-                    eff_height = height if not is_vertical else width
+                    # - unknown (LinkedIn etc): use 0, will be shown as "SD"
+                    if height and width:
+                        eff_height = height if not is_vertical else width
+                    elif height:
+                        eff_height = height
+                    elif width:
+                        eff_height = width
+                    else:
+                        eff_height = 0
                     # Parse resolution label from format_note (e.g. "1080p", "720p")
                     # or fall back to eff_height
-                    res_label = format_note if format_note else f"{eff_height}p"
+                    if format_note:
+                        res_label = format_note
+                    elif eff_height > 0:
+                        res_label = f"{eff_height}p"
+                    elif video_ext and video_ext != "none":
+                        res_label = video_ext.upper()
+                    else:
+                        res_label = "SD"
+                    # Skip formats with completely unknown resolution (no height, no width, no note)
+                    if eff_height == 0 and not format_note:
+                        # Keep it only if it's the only format (LinkedIn-style single format)
+                        # but give it a display label
+                        pass
                     formats.append({
                         "format_id": f.get("format_id", ""),
                         "ext": ext,
@@ -684,11 +720,22 @@ class Handler(http.server.BaseHTTPRequestHandler):
                     if bucket not in seen_res:
                         seen_res.add(bucket)
                         unique_formats.append(f)
+                # Deduplicate audio formats by bitrate (keep highest quality per bitrate)
+                seen_abr = set()
+                unique_audio = []
+                audio_formats.sort(key=lambda x: (-x["abr"], -x["filesize"]))
+                for af in audio_formats:
+                    # Round abr to nearest 16kbps for dedup
+                    abr_key = round(af["abr"] / 16) * 16 if af["abr"] > 0 else 0
+                    if abr_key not in seen_abr:
+                        seen_abr.add(abr_key)
+                        unique_audio.append(af)
                 self._json({
                     "title": title,
                     "duration": duration,
                     "thumbnail": thumbnail,
                     "formats": unique_formats,
+                    "audio_formats": unique_audio,
                 })
                 log.info("/probe: found %d unique resolutions for '%s'", len(unique_formats), title)
             except Exception as e:
@@ -871,9 +918,9 @@ class JobLogger(threading.Thread):
                 j["log"].append("[warn] ffmpeg not found — audio extraction may fail")
         else:
             # If a specific format_id was requested (from resolution button),
-            # use it directly instead of auto-selecting best.
+            # use it with +bestaudio to ensure audio is included.
             if self.format_id:
-                fmt = self.format_id
+                fmt = f"{self.format_id}+bestaudio/best"
                 post = ["--merge-output-format", "mp4"]
                 if ffmpeg_ok:
                     post += ["--recode-video", "mp4"]
