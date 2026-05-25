@@ -325,6 +325,93 @@ def _find_ffmpeg():
 def _has_ffmpeg():
     """Return True if ffmpeg is available."""
     return _find_ffmpeg() is not None
+
+def install_ffmpeg():
+    """Download ffmpeg essentials into .bin/. Returns True on success."""
+    system = platform.system()
+    is_win = system == "Windows"
+
+    os.makedirs(YT_DLP_DIR, exist_ok=True)
+
+    if is_win:
+        # BtbN FFmpeg Windows builds (essentials — smaller download)
+        url = "https://github.com/BtbN/FFmpeg-Builds/releases/download/latest/ffmpeg-master-latest-win64-gpl.zip"
+        zip_path = os.path.join(YT_DLP_DIR, "ffmpeg.zip")
+        setup_state["phase"] = "installing_ffmpeg"
+        msg("⬇️  Скачиваю ffmpeg (~80 MB)… Это нужно для полного качества видео.", "info")
+        log.info("Downloading ffmpeg from %s", url)
+        setup_state["progress"] = 35
+
+        try:
+            # Download zip
+            if shutil.which("curl"):
+                cmd = ["curl", "-L", "-f", "--connect-timeout", "30", "--max-time", "600",
+                       "-o", zip_path, url]
+                result = subprocess.run(cmd, capture_output=True, text=True, timeout=610,
+                                        creationflags=subprocess.CREATE_NO_WINDOW if is_win else 0)
+                if result.returncode != 0:
+                    log.warning("curl failed (%d): %s", result.returncode, result.stderr[:200])
+                    raise RuntimeError("curl download failed")
+            else:
+                urllib.request.urlretrieve(url, zip_path)
+
+            setup_state["progress"] = 70
+            msg("📦 Распаковываю ffmpeg…", "info")
+            log.info("Extracting ffmpeg zip to %s", YT_DLP_DIR)
+
+            # Extract only ffmpeg.exe and ffprobe.exe from the zip
+            with zipfile.ZipFile(zip_path, "r") as zf:
+                for member in zf.namelist():
+                    basename = os.path.basename(member)
+                    if basename in ("ffmpeg.exe", "ffprobe.exe"):
+                        target = os.path.join(YT_DLP_DIR, basename)
+                        with zf.open(member) as src, open(target, "wb") as dst:
+                            shutil.copyfileobj(src, dst)
+                        log.info("Extracted %s -> %s", basename, target)
+
+            # Clean up zip
+            os.remove(zip_path)
+
+            ffmpeg_path = os.path.join(YT_DLP_DIR, "ffmpeg.exe")
+            if os.path.isfile(ffmpeg_path):
+                msg("✅ ffmpeg установлен — видео будет в полном качестве!", "ok")
+                log.info("ffmpeg installed successfully at %s", ffmpeg_path)
+                setup_state["progress"] = 80
+                return True
+            else:
+                raise FileNotFoundError("ffmpeg.exe not found after extraction")
+
+        except Exception as e:
+            log.error("ffmpeg installation failed: %s", e, exc_info=True)
+            msg("⚠️ Не удалось скачать ffmpeg. Качество видео может быть ограничено.", "info")
+            # Clean up partial download
+            if os.path.exists(zip_path):
+                try:
+                    os.remove(zip_path)
+                except Exception:
+                    pass
+            return False
+
+    elif system == "Darwin":
+        msg("🍎 Установи ffmpeg:", "info")
+        msg("   brew install ffmpeg", "info")
+        ffmpeg_path = _find_ffmpeg()
+        if ffmpeg_path:
+            msg("✅ ffmpeg найден: " + ffmpeg_path, "ok")
+            return True
+        return False
+
+    else:
+        # Linux
+        msg("🐧 Установи ffmpeg:", "info")
+        msg("   Ubuntu/Debian: sudo apt install ffmpeg", "info")
+        msg("   Fedora:        sudo dnf install ffmpeg", "info")
+        msg("   Arch:          sudo pacman -S ffmpeg", "info")
+        ffmpeg_path = _find_ffmpeg()
+        if ffmpeg_path:
+            msg("✅ ffmpeg найден: " + ffmpeg_path, "ok")
+            return True
+        return False
 def _write_marker():
     """Write .setup_done marker file."""
     try:
@@ -362,6 +449,11 @@ def _ensure_deps():
                 return False
         else:
             log.info("_ensure_deps: yt-dlp found: %s", ver)
+
+        # ffmpeg is best-effort in silent mode — don't fail if download fails
+        if not _has_ffmpeg():
+            log.info("_ensure_deps: ffmpeg not found, attempting install...")
+            install_ffmpeg()
 
         os.makedirs(OUTPUT_BASE, exist_ok=True)
         setup_state["python_ok"] = True
@@ -417,8 +509,18 @@ def run_setup():
             log.error("yt-dlp installation failed")
             return
 
-    # ── Step 3: Ready ────────────────────────────────────────────
-    setup_state["progress"] = 90
+    # ── Step 3: ffmpeg ───────────────────────────────────────────
+    if _has_ffmpeg():
+        log.info("ffmpeg found: %s", _find_ffmpeg())
+        msg(f"✅ ffmpeg найден", "ok")
+        setup_state["progress"] = 85
+    else:
+        log.info("ffmpeg not found, installing...")
+        install_ffmpeg()  # best-effort; don't fail setup if it errors
+        setup_state["progress"] = 90
+
+    # ── Step 4: Ready ────────────────────────────────────────────
+    setup_state["progress"] = 95
     log.info("Creating downloads directory: %s", OUTPUT_BASE)
     msg("📁 Создаю папку для загрузок…", "info")
     os.makedirs(OUTPUT_BASE, exist_ok=True)
@@ -663,19 +765,20 @@ class JobLogger(threading.Thread):
                 j["log"].append("[warn] ffmpeg not found — audio extraction may fail")
         else:
             if ffmpeg_ok:
-                # With ffmpeg: best video + best audio, merge to mp4.
-                # No container restriction on bestvideo — Shorts have better
-                # streams in webm/VP9/AV1; ffmpeg will remux to mp4.
+                # With ffmpeg: best video + best audio, merge + recode to mp4.
+                # No container restriction on bestvideo — Shorts may have
+                # better streams in webm/VP9/AV1; ffmpeg handles recoding.
                 fmt = "bestvideo+bestaudio/best"
                 post = ["--merge-output-format", "mp4", "--recode-video", "mp4"]
             else:
-                # Without ffmpeg: we can't merge separate streams, so we need
-                # a single-file format. For YouTube Shorts the combined mp4 is
-                # often only 360p, so try bestaudio+bestvideo in DASH mp4 first,
-                # then fall back to best combined.
-                fmt = "bestvideo[ext=mp4]+bestaudio[ext=m4a]/best[ext=mp4]/best"
+                # Without ffmpeg we cannot merge separate video/audio DASH
+                # streams. YouTube Shorts combined (progressive) mp4 files
+                # are capped at ~360p.  Warn user and accept the limitation.
+                fmt = "best[ext=mp4]/best"
                 post = []
-                j["log"].append("[warn] ffmpeg not found — downloading single-file format")
+                j["log"].append(
+                    "[warn] ffmpeg not found — video quality may be limited. "
+                    "Install ffmpeg and restart for full quality." )
 
         out_tmpl = os.path.join(out_dir, "%(title)s [%(id)s].%(ext)s")
         cmd = [self.yt, "-f", fmt, *post, "-o", out_tmpl,
