@@ -163,6 +163,20 @@ else:
 
 # ── Open UI in a native app window (pywebview) ─────────────────────
 log.info("Opening window...")
+
+def _do_cleanup():
+    """Clean up server subprocesses and lock file before exit."""
+    log.info("_do_cleanup: running")
+    # Kill active yt-dlp subprocess via server's shutdown endpoint
+    try:
+        import urllib.request as _ur
+        _ur.urlopen("http://127.0.0.1:18765/shutdown", timeout=5)
+        log.info("_do_cleanup: /shutdown sent successfully")
+    except Exception as e:
+        log.warning("_do_cleanup: could not send /shutdown: %s", e)
+    # Remove lock file
+    _cleanup_lock()
+
 try:
     import webview
 
@@ -178,32 +192,16 @@ try:
     if window:
         def _on_closing():
             log.info("=== Window close event received ===")
-            log.info("Thread count: %d", threading.active_count())
-            for t in threading.enumerate():
-                log.info("  thread: %s (daemon=%s)", t.name, t.daemon)
-            try:
-                import urllib.request as _ur
-                # Tell server to kill active subprocesses and shut down
-                log.info("Sending /shutdown to server...")
-                _ur.urlopen("http://127.0.0.1:18765/shutdown", timeout=5)
-                log.info("/shutdown sent successfully")
-            except Exception as e:
-                log.warning("Could not send /shutdown: %s", e, exc_info=True)
-                # Fallback: try direct server shutdown
-                try:
-                    import server as srv
-                    if hasattr(srv, "srv") and srv.srv:
-                        _t = threading.Thread(target=lambda: (
-                            log.info("fallback: calling srv.srv.shutdown()..."),
-                            srv.srv.shutdown(),
-                            log.info("fallback: srv.srv.shutdown() done")
-                        ), daemon=True)
-                        _t.start()
-                except Exception as e2:
-                    log.error("Fallback shutdown also failed: %s", e2)
-            log.info("_on_closing complete")
+            _do_cleanup()
 
         window.events.closing += _on_closing
+
+    # Also handle SIGTERM (e.g. from xdotool windowclose or kill)
+    import signal as _signal
+    def _sigterm_handler(signum, frame):
+        log.info("=== SIGTERM received ===")
+        _do_cleanup()
+    _signal.signal(_signal.SIGTERM, _sigterm_handler)
 
     # Try renderers in order of preference:
     #   1. edgechromium (WebView2, modern Chromium — needs WebView2 Runtime)
@@ -238,3 +236,8 @@ except Exception as e:
     except KeyboardInterrupt:
         pass
     log.info("Main thread unblocked — exiting")
+
+# Cleanup lock file — must be done here, not in atexit, because
+# pywebview/GTK may call exit() internally and skip atexit handlers.
+_cleanup_lock()
+log.info("=== Instrumentarium shutdown complete ===")

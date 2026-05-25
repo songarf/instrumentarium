@@ -663,10 +663,14 @@ class JobLogger(threading.Thread):
                 j["log"].append("[warn] ffmpeg not found — audio extraction may fail")
         else:
             if ffmpeg_ok:
-                fmt = "bestvideo[ext=mp4]+bestaudio[ext=m4a]/best[ext=mp4]/best"
+                # Don't restrict bestvideo to mp4 — for Shorts and some videos
+                # the best video is webm/VP9/AV1. yt-dlp will merge + remux to mp4
+                # via ffmpeg (--merge-output-format + --ffmpeg-location below).
+                fmt = "bestvideo+bestaudio/best"
                 post = ["--merge-output-format", "mp4"]
             else:
-                fmt = "best[ext=mp4]/bestvideo[ext=mp4]+bestaudio[ext=m4a]/best"
+                # Without ffmpeg: try combined file first, then single-stream mp4
+                fmt = "best[ext=mp4]/best"
                 post = []
                 j["log"].append("[warn] ffmpeg not found — downloading single-file format")
 
