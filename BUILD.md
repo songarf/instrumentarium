@@ -60,6 +60,8 @@ instrumentarium/
 ├── .github/workflows/build.yml # CI/CD
 ├── .gitignore                  # CONTEXT.md игнорируется
 ├── BUILD.md                    # Этот файл
+├── SPEC.md                     # Техническая спецификация
+├── USER_GUIDE.md               # Руководство пользователя
 ├── README.md                   # Описание проекта для GitHub
 └── downloads/                  # ← Создаётся автоматически (папка платформ)
 ```
@@ -179,6 +181,7 @@ server.py (импортируется как модуль из app.py)
   │       - is_video: (vcodec != "none" and vcodec is not None) or
   │                   (video_ext != "none" and video_ext is not None)
   │       - eff_height: width for vertical, height for horizontal
+  │       - display_label: format_note → eff_height → format_id → "Скачать видео"
   │       - Дедупликация по стандартным бакетам
   │       - audio_formats: дедупликация по битрейту
   │
@@ -186,6 +189,7 @@ server.py (импортируется как модуль из app.py)
         - Video: format_id+bestaudio/best → --merge-output-format mp4
         - Audio: bestaudio[ext=m4a]/bestaudio → --extract-audio → mp3
         - Если ffmpeg: --recode-video mp4, --embed-metadata, --embed-thumbnail
+        - Имя файла: %(title).120s [%(id)s].%(ext)s (ограничение 120 символов)
 ```
 
 ---
@@ -321,7 +325,7 @@ Download Thread (daemon, server.py → JobLogger)
 ### 6.5. Папка `downloads/`
 - **Расположение:** `_BASE_DIR/downloads/`
 - **Подпапки:** `youtube/`, `twitter/`, `tiktok/`, `instagram/`, `facebook/`, `linkedin/`, `other/`
-- **Формат файлов:** `%(title)s [%(id)s].%(ext)s`
+- **Формат файлов:** `%(title).120s [%(id)s].%(ext)s` (ограничение 120 символов)
 
 ---
 
@@ -343,7 +347,17 @@ is_vertical = height > width
 eff_height = width if is_vertical else height  # 1080, а не 1920
 ```
 
-### 7.3. Форматы скачивания
+### 7.3. Логика display_label для кнопок
+
+| Приоритет | Условие | Label |
+|-----------|---------|-------|
+| 1 | `format_note` существует и не содержит "DASH" | `format_note` (например "1080p") |
+| 2 | `eff_height > 0` | `"{eff_height}p"` (например "720p") |
+| 3 | `format_id` существует | `format_id.upper()` (например "SD", "HD" для Facebook) |
+| 4 | `video_ext` существует | `"Скачать видео"` |
+| 5 | Иначе | `"Скачать видео"` |
+
+### 7.4. Форматы скачивания
 
 ```
 Видео (конкретный формат из кнопки):
@@ -359,11 +373,22 @@ eff_height = width if is_vertical else height  # 1080, а не 1920
   bestaudio[ext=m4a]/bestaudio → --extract-audio --audio-format mp3 --audio-quality 0
 ```
 
-### 7.4. Дедупликация форматов
+### 7.5. Дедупликация форматов
 
-**Видео:** группировка по стандартным бакетам (144, 240, 360, 480, 720, 1080, 1440, 2160, 4320). Для каждой кнопки — ближайший формат ≤ target.
+**Видео:** группировка по стандартным бакетам (144, 240, 360, 480, 720, 1080, 1440, 2160, 4320).
 
-**Аудио:** группировка по битрейту (шаг 16kbps). Сортировка по убыванию битрейта.
+**Аудио:** группировка по битрейту (шаг 16kbps), сортировка по убыванию.
+
+### 7.6. Особенности платформ
+
+| Платформа | Особенность | Решение |
+|-----------|-------------|---------|
+| LinkedIn | `vcodec=None`, `video_ext=mp4` | Определение по `video_ext` |
+| LinkedIn | Нет данных о разрешении | Label "Скачать видео" |
+| LinkedIn | Длинные title с UTM | Обрезка до 120 символов |
+| Instagram | `format_note="DASH video"` | Пропуск DASH, использование разрешения |
+| Facebook | Форматы `sd`/`hd` без разрешения | Label из `format_id.upper()` |
+| YouTube Shorts | Вертикальное видео 1080×1920 | `eff_height = width` → "1080p" |
 
 ---
 
@@ -475,9 +500,12 @@ python -m pytest tests/ -v
 - Аудио дорожка: +bestaudio/best для всех видео форматов
 - Аудио UI: битрейт (слева) + размер (справа) на кнопках
 - Фиксированный размер окна 620×720 (resizable=False)
-- Фиксированная позиция кнопки "Загрузки" (min-height: 170px на dl-options)
+- Фиксированная позиция кнопки "Загрузки" (min-height: 120px на dl-options)
 - Вертикальные видео (Shorts): корректное отображение разрешения через eff_height
 - /probe endpoint: динамические кнопки форматов на основе yt-dlp
+- Компактный UI: уменьшены отступы и размеры для помещения в экран
+- display_label: корректные названия кнопок для всех платформ (DASH, SD/HD, разрешение)
+- Ограничение длины имени файла: 120 символов для совместимости с Windows
 
 ### ⬜ Планы
 - Расширить тесты: HTTP-эндпоинты, setup wizard, JobLogger
@@ -530,8 +558,22 @@ linkedin.com              → linkedin
 ```
 Размер: 620×720 пикселей
 Resizable: False (пользователь не может менять размер)
+Скролл: Контент скроллится если не помещается (overflow-y: auto)
 Рендерер: edgechromium → cef → auto-detect (Windows)
           GTK/Qt (Linux), Cocoa (macOS)
+```
+
+### UI компактность
+```
+Card padding: 24px (было 40px)
+Header: 1.2rem (было 1.4rem)
+Subtitle margin-bottom: 16px (было 28px)
+Setup icon: 2.5rem (было 3.5rem)
+URL input padding: 10px 14px (было 12px 16px)
+Mode toggle padding: 10px (было 14px)
+dl-options min-height: 120px (было 170px)
+res-btn padding: 12px 16px (было 14px 20px)
+big-downloads-btn margin-top: 12px (было 20px)
 ```
 
 ---
