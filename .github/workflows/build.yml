@@ -36,15 +36,15 @@ jobs:
         include:
           - os: ubuntu-latest
             spec: video-downloader.spec
-            artifact-name: linux
+            artifact-name: linux-instrumentarium
 
           - os: windows-latest
             spec: video-downloader-win.spec
-            artifact-name: windows
+            artifact-name: windows-instrumentarium
 
           - os: macos-latest
             spec: video-downloader.spec
-            artifact-name: macos
+            artifact-name: macos-instrumentarium
 
     runs-on: ${{ matrix.os }}
     steps:
