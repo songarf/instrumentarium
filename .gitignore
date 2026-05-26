@@ -32,6 +32,8 @@ downloads/
 # Runtime state
 .setup_done
 .instrumentarium.lock
+.instrumentarium.cookies.txt
+.cookies.txt
 instrumentarium.log
 
 # OS

@@ -312,16 +312,19 @@
   <!-- COOKIES DIALOG                                        -->
   <!-- ═══════════════════════════════════════════════════════ -->
   <div id="cookiesDialog" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.7);z-index:999;align-items:center;justify-content:center;">
-    <div style="background:#1a1a2e;border:1px solid #2a2a4a;border-radius:16px;padding:24px;width:460px;max-width:90vw;box-shadow:0 20px 60px rgba(0,0,0,.5);">
+    <div style="background:#1a1a2e;border:1px solid #2a2a4a;border-radius:16px;padding:24px;width:520px;max-width:95vw;box-shadow:0 20px 60px rgba(0,0,0,.5);">
       <h2 style="font-size:1rem;margin-bottom:6px;color:#fff;">🍪 Cookies</h2>
-      <p style="font-size:.78rem;color:#888;margin-bottom:16px;line-height:1.5;">
-        Укажите путь к файлу cookies.txt (Netscape format) для сайтов, требующих авторизацию (LinkedIn и др.).<br>
-        <span style="color:#666;">Экспортируйте куки из браузера через расширение "Get cookies.txt LOCALLY".</span>
+      <p style="font-size:.78rem;color:#888;margin-bottom:6px;line-height:1.5;">
+        Вставьте содержимое файла cookies.txt ниже. Поддерживается Netscape и JSON формат.
       </p>
-      <input type="text" id="cookiesPath" placeholder="/path/to/cookies.txt"
-        style="width:100%;background:#12122a;border:1px solid #2a2a4a;border-radius:10px;padding:10px 14px;color:#e0e0e0;font-size:.85rem;outline:none;margin-bottom:12px;">
+      <p style="font-size:.72rem;color:#666;margin-bottom:12px;line-height:1.4;">
+        Как получить: установите расширение <strong>"Get cookies.txt LOCALLY"</strong> → откройте linkedin.com → нажмите на расширение → Export → скопируйте текст сюда.
+      </p>
+      <textarea id="cookiesContent" rows="6" placeholder="# Netscape HTTP Cookie File&#10;.linkedin.com	TRUE	/	TRUE	1234567890	li_at	ATVGLRE..."
+        style="width:100%;background:#12122a;border:1px solid #2a2a4a;border-radius:10px;padding:10px 14px;color:#e0e0e0;font-size:.78rem;outline:none;margin-bottom:12px;resize:vertical;font-family:monospace;box-sizing:border-box;"></textarea>
       <div style="display:flex;gap:8px;justify-content:flex-end;">
         <button onclick="closeCookiesDialog()" style="padding:10px 20px;background:none;border:1px solid #2a2a4a;border-radius:10px;color:#888;cursor:pointer;font-size:.85rem;">Отмена</button>
+        <button onclick="clearCookies()" style="padding:10px 20px;background:none;border:1px solid #ff4757;border-radius:10px;color:#ff4757;cursor:pointer;font-size:.85rem;">Очистить</button>
         <button onclick="saveCookies()" style="padding:10px 20px;background:linear-gradient(135deg,#6c5ce7,#a78bfa);border:none;border-radius:10px;color:#fff;cursor:pointer;font-size:.85rem;font-weight:600;">Сохранить</button>
       </div>
       <p id="cookiesStatus" style="font-size:.72rem;color:#666;margin-top:10px;"></p>
@@ -669,6 +672,7 @@ let dlPoll = null;
 function showError(title, message) {
   document.getElementById('errorTitle').textContent = title;
   document.getElementById('errorMessage').textContent = message;
+  document.getElementById('dlProgress').style.display = 'block';
   document.getElementById('errorToast').classList.add('visible');
 }
 
@@ -779,8 +783,7 @@ function enableDlButtons() {
 
 /* ── Cookies dialog ─────────────────────────────────────── */
 function showCookiesDialog() {
-  const saved = localStorage.getItem('cookiesPath') || '';
-  document.getElementById('cookiesPath').value = saved;
+  document.getElementById('cookiesContent').value = '';
   document.getElementById('cookiesStatus').textContent = '';
   document.getElementById('cookiesDialog').style.display = 'flex';
 }
@@ -790,18 +793,24 @@ function closeCookiesDialog() {
 }
 
 function saveCookies() {
-  const path = document.getElementById('cookiesPath').value.trim();
+  const content = document.getElementById('cookiesContent').value.trim();
   const status = document.getElementById('cookiesStatus');
+  if (!content) {
+    status.textContent = '❌ Вставьте содержимое cookies.txt';
+    status.style.color = '#ff4757';
+    return;
+  }
+  // Send as base64 to handle special chars safely
+  const b64 = btoa(unescape(encodeURIComponent(content)));
   fetch('/cookies', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ path: path })
+    body: JSON.stringify({ content: b64 })
   })
   .then(r => r.json())
   .then(data => {
     if (data.ok) {
-      localStorage.setItem('cookiesPath', path);
-      status.textContent = path ? '✅ Cookies установлены: ' + path : '✅ Cookies очищены';
+      status.textContent = '✅ Cookies сохранены (' + content.split('\n').length + ' строк)';
       status.style.color = '#4caf50';
     } else {
       status.textContent = '❌ ' + (data.error || 'Ошибка');
@@ -812,6 +821,24 @@ function saveCookies() {
     status.textContent = '❌ Ошибка соединения';
     status.style.color = '#ff4757';
   });
+}
+
+function clearCookies() {
+  const status = document.getElementById('cookiesStatus');
+  fetch('/cookies', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({})
+  })
+  .then(r => r.json())
+  .then(data => {
+    if (data.ok) {
+      document.getElementById('cookiesContent').value = '';
+      status.textContent = '✅ Cookies очищены';
+      status.style.color = '#4caf50';
+    }
+  })
+  .catch(() => {});
 }
 
 </script>

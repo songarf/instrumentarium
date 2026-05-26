@@ -775,17 +775,39 @@ class Handler(http.server.BaseHTTPRequestHandler):
             length = int(self.headers.get("Content-Length", 0))
             body = json.loads(self.rfile.read(length) or b"{}")
             path = body.get("path", "").strip()
+            content = body.get("content", "").strip()
+            # Clear cookies
+            if not path and not content:
+                _cookies_path[0] = None
+                log.info("/cookies: cleared")
+                self._json({"ok": True, "path": None})
+                return
+            # Content provided (base64 or raw text) — save to temp file
+            if content:
+                import base64, tempfile
+                try:
+                    # Try base64 decode first, fallback to raw text
+                    try:
+                        raw = base64.b64decode(content).decode("utf-8")
+                    except Exception:
+                        raw = content
+                    tmp = os.path.join(_BASE_DIR, ".cookies.txt")
+                    with open(tmp, "w", encoding="utf-8") as f:
+                        f.write(raw)
+                    _cookies_path[0] = tmp  # type: ignore
+                    log.info("/cookies: saved %d chars to %s", len(raw), tmp)
+                    self._json({"ok": True, "path": tmp})
+                except Exception as e:
+                    log.error("/cookies: save failed: %s", e)
+                    self._json({"error": str(e)})
+                return
+            # Path provided — use file directly
             if path and os.path.isfile(path):
                 _cookies_path[0] = path
                 log.info("/cookies: set to %s", path)
                 self._json({"ok": True, "path": path})
-            elif not path:
-                _cookies_path[0] = None
-                log.info("/cookies: cleared")
-                self._json({"ok": True, "path": None})
-            else:
-                self._json({"error": "File not found: " + path})
-            return
+                return
+            self._json({"error": "File not found: " + path})
 
         if self.path == "/download":
             log.info("/download: phase=%s, url_body_pending", setup_state["phase"])
