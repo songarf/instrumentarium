@@ -315,12 +315,22 @@
     <div style="background:#1a1a2e;border:1px solid #2a2a4a;border-radius:16px;padding:24px;width:520px;max-width:95vw;box-shadow:0 20px 60px rgba(0,0,0,.5);">
       <h2 style="font-size:1rem;margin-bottom:6px;color:#fff;">🍪 Cookies</h2>
       <p style="font-size:.78rem;color:#888;margin-bottom:6px;line-height:1.5;">
-        Вставьте содержимое файла cookies.txt ниже. Поддерживается Netscape и JSON формат.
+        Перетащите файл cookies.txt или нажмите на область ниже. Также можно вставить текст вручную.
       </p>
       <p style="font-size:.72rem;color:#666;margin-bottom:12px;line-height:1.4;">
-        Как получить: установите расширение <strong>"Get cookies.txt LOCALLY"</strong> → откройте linkedin.com → нажмите на расширение → Export → скопируйте текст сюда.
+        Как получить: расширение <strong>"Get cookies.txt LOCALLY"</strong> → linkedin.com → Export.
       </p>
-      <textarea id="cookiesContent" rows="6" placeholder="# Netscape HTTP Cookie File&#10;.linkedin.com	TRUE	/	TRUE	1234567890	li_at	ATVGLRE..."
+
+      <!-- Drag & drop zone -->
+      <div id="cookieDropzone"
+           onclick="document.getElementById('cookieFileInput').click()"
+           style="border:2px dashed #2a2a4a;border-radius:12px;padding:24px;text-align:center;cursor:pointer;margin-bottom:12px;transition:border-color .2s,background .2s;">
+        <div style="font-size:2rem;margin-bottom:6px;">📄</div>
+        <div style="font-size:.82rem;color:#888;">Перетащите файл <strong>cookies.txt</strong> сюда<br>или нажмите для выбора</div>
+        <input type="file" id="cookieFileInput" accept=".txt,text/plain" style="display:none">
+      </div>
+
+      <textarea id="cookiesContent" rows="4" placeholder="…или вставьте содержимое cookies.txt сюда"
         style="width:100%;background:#12122a;border:1px solid #2a2a4a;border-radius:10px;padding:10px 14px;color:#e0e0e0;font-size:.78rem;outline:none;margin-bottom:12px;resize:vertical;font-family:monospace;box-sizing:border-box;"></textarea>
       <div style="display:flex;gap:8px;justify-content:flex-end;">
         <button onclick="closeCookiesDialog()" style="padding:10px 20px;background:none;border:1px solid #2a2a4a;border-radius:10px;color:#888;cursor:pointer;font-size:.85rem;">Отмена</button>
@@ -840,6 +850,59 @@ function clearCookies() {
   })
   .catch(() => {});
 }
+
+/* ── Drag & Drop / File input for cookies ─────────────────── */
+(function() {
+  const dropzone = document.getElementById('cookieDropzone');
+  const fileInput = document.getElementById('cookieFileInput');
+  const textarea = document.getElementById('cookiesContent');
+  const status = document.getElementById('cookiesStatus');
+
+  // Highlight on drag over
+  ['dragenter', 'dragover'].forEach(evt => {
+    dropzone.addEventListener(evt, e => {
+      e.preventDefault();
+      e.stopPropagation();
+      dropzone.style.borderColor = '#6c5ce7';
+      dropzone.style.background = 'rgba(108,92,231,.08)';
+    });
+  });
+  ['dragleave', 'drop'].forEach(evt => {
+    dropzone.addEventListener(evt, e => {
+      e.preventDefault();
+      e.stopPropagation();
+      dropzone.style.borderColor = '#2a2a4a';
+      dropzone.style.background = '';
+    });
+  });
+
+  // Handle file drop
+  dropzone.addEventListener('drop', e => {
+    const file = e.dataTransfer.files[0];
+    if (file) readFile(file);
+  });
+
+  // Handle file input change
+  fileInput.addEventListener('change', e => {
+    const file = e.target.files[0];
+    if (file) readFile(file);
+  });
+
+  function readFile(file) {
+    const reader = new FileReader();
+    reader.onload = e => {
+      textarea.value = e.target.result;
+      status.textContent = '✅ Файл загружен: ' + file.name + ' (' + file.size.toLocaleString() + ' байт)';
+      status.style.color = '#4caf50';
+      dropzone.style.borderColor = '#4caf50';
+    };
+    reader.onerror = () => {
+      status.textContent = '❌ Не удалось прочитать файл';
+      status.style.color = '#ff4757';
+    };
+    reader.readAsText(file);
+  }
+})();
 
 </script>
 </body>

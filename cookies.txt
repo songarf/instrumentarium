@@ -1,0 +1,2 @@
+# Netscape HTTP Cookie File
+.linkedin.com	TRUE	/	TRUE	0	li_at	TEST
