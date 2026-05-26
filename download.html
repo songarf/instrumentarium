@@ -332,8 +332,12 @@
 
 <script>
 /* ── Constants ───────────────────────────────────────────── */
+const LABELS = {
+  download_video:  'Скачать видео',
+  download_audio:  'Скачать аудио',
+  audio_from_video:'Лучшее качество · MP3',
+};
 const PLATS = [
-  { name:'youtube',   hosts:['youtube.com','youtu.be'] },
   { name:'twitter',   hosts:['twitter.com','x.com'] },
   { name:'tiktok',    hosts:['tiktok.com'] },
   { name:'instagram', hosts:['instagram.com'] },
@@ -456,7 +460,7 @@ function renderResButtons() {
       // No separate audio streams — offer bestaudio/best fallback (ffmpeg will extract)
       const btn = document.createElement('button');
       btn.className = 'res-btn';
-      btn.innerHTML = `<span class="res-label">🎵 Скачать аудио</span><span class="res-meta">Лучшее качество · MP3</span>`;
+      btn.innerHTML = `<span class="res-label">${LABEL.download_audio}</span><span class="res-meta">${LABELS.audio_from_video}</span>`;
       btn.onclick = () => startDownloadBestAudio();
       audioContainer.appendChild(btn);
       return;
