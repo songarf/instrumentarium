@@ -125,10 +125,10 @@ app.py (main thread)
   │
   └── 7. Открытие окна pywebview:
           Размер: 620×720, resizable=False
-          Windows: edgechromium → cef → auto-detect
+          Windows: edgechromium → auto-detect (CEF удалён для уменьшения размера билда)
           Linux:   auto-detect (GTK/Qt)
           macOS:   auto-detect (Cocoa)
-          При закрытии → HTTP POST /shutdown → kill subprocess → stop server
+          При закрытии → HTTP POST /shutdown → kill subprocess → stop server (без sleep, мгновенный exit)
 ```
 
 ### 3.2. Backend: server.py
