@@ -10,22 +10,14 @@ try:
 except Exception:
     webview_datas, webview_binaries, webview_hiddenimports = [], [], ['webview']
 
-# Collect CEF Python dependencies (Chromium Embedded Framework for Windows)
-cef_binaries, cef_datas, cef_imports = [], [], []
-try:
-    from PyInstaller.utils.hooks import collect_all
-    cef_binaries, cef_datas, cef_imports = collect_all('cefpython3')
-except Exception:
-    cef_imports = ['cefpython3']
-
 a = Analysis(
     ['app.py', 'server.py'],
     pathex=[],
-    binaries=webview_binaries + cef_binaries,
-    datas=webview_datas + cef_datas + [
+    binaries=webview_binaries,
+    datas=webview_datas + [
         ('download.html', '.'),
     ],
-    hiddenimports=webview_hiddenimports + cef_imports + [
+    hiddenimports=webview_hiddenimports + [
         'bottle', 'proxy_tools',
     ],
     hookspath=[],

@@ -193,8 +193,6 @@ try:
             log.info("=== Window close event received ===")
             _do_cleanup()
             log.info("=== Final exit ===")
-            # Give it a moment to finish logging/shutdown
-            time.sleep(0.5)
             os._exit(0)
 
         window.events.closing += _on_closing
@@ -205,15 +203,13 @@ try:
         log.info("=== SIGTERM received ===")
         _do_cleanup()
         log.info("=== Final exit ===")
-        time.sleep(0.5)
         os._exit(0)
     _signal.signal(_signal.SIGTERM, _sigterm_handler)
 
     # Try renderers in order of preference:
     #   1. edgechromium (WebView2, modern Chromium — needs WebView2 Runtime)
-    #   2. cef (Chromium Embedded — bundled, no external deps)
-    #   3. default auto-detect (GTK/Qt/Cocoa depending on platform)
-    _renderers = ["edgechromium", "cef"] if sys.platform == "win32" else []
+    #   2. default auto-detect (GTK/Qt/Cocoa depending on platform)
+    _renderers = ["edgechromium"] if sys.platform == "win32" else []
     _started = False
     for _gui in _renderers:
         try:
