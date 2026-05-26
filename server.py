@@ -808,6 +808,9 @@ class Handler(http.server.BaseHTTPRequestHandler):
             url = body.get("url", "").strip()
             dl_mode = body.get("mode", "video")
             format_id = body.get("format_id", "")
+            # Fallback: if no separate audio streams, use bestaudio/best
+            if dl_mode == "audio" and format_id == "__best_audio__":
+                format_id = ""  # signal to use bestaudio/best fallback
             log.info("/download: url=%s mode=%s format_id=%s", url, dl_mode, format_id)
             if not url:
                 self._json({"error": "URL is required"})
@@ -941,10 +944,14 @@ class JobLogger(threading.Thread):
         log.info("JobLogger[%s]: ffmpeg=%s", self.job_id, ffmpeg)
 
         if self.mode == "audio":
-            fmt = "bestaudio[ext=m4a]/bestaudio"
+            # For platforms that provide separate audio streams (YouTube, etc.),
+            # prefer m4a container. Fall back to bestaudio/best for platforms
+            # like TikTok that only have video+audio muxed — ffmpeg will extract.
+            if ffmpeg_ok:
+                fmt = "bestaudio[ext=m4a]/bestaudio/best"
+            else:
+                fmt = "bestaudio[ext=m4a]/bestaudio"
             post = ["--extract-audio", "--audio-format", "mp3", "--audio-quality", "0"]
-            if not ffmpeg_ok:
-                j["log"].append("[warn] ffmpeg not found — audio extraction may fail")
         else:
             # If a specific format_id was requested (from resolution button),
             # use it with +bestaudio to ensure audio is included.

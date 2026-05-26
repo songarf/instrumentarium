@@ -445,6 +445,12 @@ function renderResButtons() {
     audioContainer.innerHTML = '';
     audioContainer.classList.remove('hidden');
     if (!probedAudioFormats || !probedAudioFormats.length) {
+      // No separate audio streams — offer bestaudio/best fallback (ffmpeg will extract)
+      const btn = document.createElement('button');
+      btn.className = 'res-btn';
+      btn.innerHTML = `<span class="res-label">🎵 MP3 (из видео)</span><span class="res-meta">Лучшее качество · MP3</span>`;
+      btn.onclick = () => startDownloadBestAudio();
+      audioContainer.appendChild(btn);
       return;
     }
     for (const af of probedAudioFormats) {
@@ -664,6 +670,18 @@ function startDownload(formatId, height) {
   const url = document.getElementById('urlInput').value.trim();
   if (!url) return;
   _startDownload(url, 'video', formatId, height);
+}
+
+function startDownloadBestAudio() {
+  const url = document.getElementById('urlInput').value.trim();
+  if (!url) return;
+  _startDownload(url, 'audio', '__best_audio__');
+}
+
+function startDownloadAudio(audioFormatId) {
+  const url = document.getElementById('urlInput').value.trim();
+  if (!url) return;
+  _startDownload(url, 'audio', audioFormatId || '');
 }
 
 function _startDownload(url, dlMode, formatId, height) {
