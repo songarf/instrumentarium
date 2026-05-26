@@ -520,7 +520,8 @@ function renderResButtons() {
     if (!best) continue;
     const btn = document.createElement('button');
     btn.className = 'res-btn';
-    const resLabel = best.display_label || (best.height + 'p');
+    const rawLabel = best.display_label || (best.height + 'p');
+    const resLabel = (rawLabel && rawLabel !== "0" && rawLabel !== "0p") ? rawLabel : "Скачать видео";
     const sizeStr = best.filesize ? _human(best.filesize) : '~';
     btn.innerHTML = `<span class="res-label">${resLabel}</span><span class="res-meta">${sizeStr} · ${best.ext.toUpperCase()}</span>`;
     btn.onclick = () => startDownload(best.format_id, best.height);
