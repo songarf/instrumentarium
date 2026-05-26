@@ -91,6 +91,11 @@ else:
 YT_DLP_DIR = _BIN_CANDIDATES[0]
 YT_DLP = os.path.join(YT_DLP_DIR, "yt-dlp.exe" if platform.system() == "Windows" else "yt-dlp")
 
+# ── Cookies ──────────────────────────────────────────────────────────
+# Path to a cookies.txt file (Netscape format) for sites that require
+# authentication (e.g. LinkedIn). Set via /cookies endpoint at runtime.
+_cookies_path = [None]  # list-based mutable global
+
 # ── Subprocess helper — no console windows on Windows ───────────────
 def _popen(cmd, **kwargs):
     """subprocess.Popen that never flashes a console window on Windows."""
@@ -607,7 +612,10 @@ class Handler(http.server.BaseHTTPRequestHandler):
                 self._json({"error": "yt-dlp not found"})
                 return
             try:
-                cmd = [yt, "--dump-single-json", "--no-download", "--no-playlist", "--no-check-certificates", url]
+                cmd = [yt, "--dump-single-json", "--no-download", "--no-playlist", "--no-check-certificates"]
+                if _cookies_path[0]:
+                    cmd += ["--cookies", _cookies_path[0]]
+                cmd.append(url)
                 log.info("/probe: cmd=%s", " ".join(cmd))
                 proc = _popen(cmd)
                 try:
@@ -761,6 +769,22 @@ class Handler(http.server.BaseHTTPRequestHandler):
                 t = threading.Thread(target=run_setup, daemon=True)
                 t.start()
             self._json({"ok": True})
+            return
+
+        if self.path == "/cookies":
+            length = int(self.headers.get("Content-Length", 0))
+            body = json.loads(self.rfile.read(length) or b"{}")
+            path = body.get("path", "").strip()
+            if path and os.path.isfile(path):
+                _cookies_path[0] = path
+                log.info("/cookies: set to %s", path)
+                self._json({"ok": True, "path": path})
+            elif not path:
+                _cookies_path[0] = None
+                log.info("/cookies: cleared")
+                self._json({"ok": True, "path": None})
+            else:
+                self._json({"error": "File not found: " + path})
             return
 
         if self.path == "/download":
@@ -950,7 +974,10 @@ class JobLogger(threading.Thread):
         out_tmpl = os.path.join(out_dir, "%(title).120s [%(id)s].%(ext)s")
         cmd = [self.yt, "-f", fmt, *post, "-o", out_tmpl,
                "--no-playlist", "--retries", "3",
-               "--newline", "--progress", self.url]
+               "--newline", "--progress"]
+        if _cookies_path[0]:
+            cmd += ["--cookies", _cookies_path[0]]
+        cmd.append(self.url)
         # Embedding metadata/thumbnails requires ffmpeg
         if ffmpeg_ok:
             cmd += ["--embed-metadata", "--embed-thumbnail"]

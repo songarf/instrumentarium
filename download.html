@@ -302,7 +302,30 @@
     <!-- Big Downloads button at bottom -->
     <button class="big-downloads-btn" onclick="openFolder()">📁 Загрузки</button>
 
-    <p class="footer">Готово к работе ✅</p>
+    <p class="footer">
+      <span onclick="showCookiesDialog()" style="cursor:pointer;text-decoration:underline;">🍪 Cookies</span>
+      · Готово к работе ✅
+    </p>
+  </div>
+
+  <!-- ═══════════════════════════════════════════════════════ -->
+  <!-- COOKIES DIALOG                                        -->
+  <!-- ═══════════════════════════════════════════════════════ -->
+  <div id="cookiesDialog" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.7);z-index:999;align-items:center;justify-content:center;">
+    <div style="background:#1a1a2e;border:1px solid #2a2a4a;border-radius:16px;padding:24px;width:460px;max-width:90vw;box-shadow:0 20px 60px rgba(0,0,0,.5);">
+      <h2 style="font-size:1rem;margin-bottom:6px;color:#fff;">🍪 Cookies</h2>
+      <p style="font-size:.78rem;color:#888;margin-bottom:16px;line-height:1.5;">
+        Укажите путь к файлу cookies.txt (Netscape format) для сайтов, требующих авторизацию (LinkedIn и др.).<br>
+        <span style="color:#666;">Экспортируйте куки из браузера через расширение "Get cookies.txt LOCALLY".</span>
+      </p>
+      <input type="text" id="cookiesPath" placeholder="/path/to/cookies.txt"
+        style="width:100%;background:#12122a;border:1px solid #2a2a4a;border-radius:10px;padding:10px 14px;color:#e0e0e0;font-size:.85rem;outline:none;margin-bottom:12px;">
+      <div style="display:flex;gap:8px;justify-content:flex-end;">
+        <button onclick="closeCookiesDialog()" style="padding:10px 20px;background:none;border:1px solid #2a2a4a;border-radius:10px;color:#888;cursor:pointer;font-size:.85rem;">Отмена</button>
+        <button onclick="saveCookies()" style="padding:10px 20px;background:linear-gradient(135deg,#6c5ce7,#a78bfa);border:none;border-radius:10px;color:#fff;cursor:pointer;font-size:.85rem;font-weight:600;">Сохранить</button>
+      </div>
+      <p id="cookiesStatus" style="font-size:.72rem;color:#666;margin-top:10px;"></p>
+    </div>
   </div>
 
 </div>
@@ -718,6 +741,43 @@ function _startDownload(url, dlMode, formatId, height) {
 
 function enableDlButtons() {
   document.querySelectorAll('.res-btn, .big-downloads-btn').forEach(b => b.disabled = false);
+}
+
+/* ── Cookies dialog ─────────────────────────────────────── */
+function showCookiesDialog() {
+  const saved = localStorage.getItem('cookiesPath') || '';
+  document.getElementById('cookiesPath').value = saved;
+  document.getElementById('cookiesStatus').textContent = '';
+  document.getElementById('cookiesDialog').style.display = 'flex';
+}
+
+function closeCookiesDialog() {
+  document.getElementById('cookiesDialog').style.display = 'none';
+}
+
+function saveCookies() {
+  const path = document.getElementById('cookiesPath').value.trim();
+  const status = document.getElementById('cookiesStatus');
+  fetch('/cookies', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ path: path })
+  })
+  .then(r => r.json())
+  .then(data => {
+    if (data.ok) {
+      localStorage.setItem('cookiesPath', path);
+      status.textContent = path ? '✅ Cookies установлены: ' + path : '✅ Cookies очищены';
+      status.style.color = '#4caf50';
+    } else {
+      status.textContent = '❌ ' + (data.error || 'Ошибка');
+      status.style.color = '#ff4757';
+    }
+  })
+  .catch(err => {
+    status.textContent = '❌ Ошибка соединения';
+    status.style.color = '#ff4757';
+  });
 }
 
 </script>
