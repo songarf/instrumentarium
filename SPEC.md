@@ -186,7 +186,8 @@ Main Thread (app.py)
 | GET | `/open-folder` | Открывает папку downloads |
 | POST | `/setup` | Запускает setup wizard |
 | POST | `/download` | Запускает скачивание {url, mode, format_id} |
-| POST | `/shutdown` | Kill subprocess + stop server |
+|| POST | `/cookies` | Сохранить/очистить cookies. Body: `{content: base64}` или `{}` для очистки |
+|| POST | `/shutdown` | Kill subprocess + stop server |
 
 ### 5.2. Формат /probe response
 
@@ -263,7 +264,24 @@ Main Thread (app.py)
 - Успех: `#4caf50`
 - Ошибка: `#ff4757`
 
-### 6.4. Локализация
+### 6.5. Cookies Dialog
+
+**Назначение**: загрузка cookies для доступа к приватному контенту (LinkedIn и др.)
+
+**Элементы**:
+- Drag & drop зона (или click → `<input type="file" accept=".txt">`)
+- Textarea для ручной вставки содержимого cookies.txt
+- ?-тултип рядом с «Как получить cookies.txt ?» — инструкция по экспорту из браузера
+- Кнопки: Отмена, Очистить, Сохранить
+
+**Поведение**:
+- При сохранении: кнопка блокируется → «⏳ Сохраняю…» → «✅ Готово» → автозакрытие через 1.2с
+- При ошибке: разблокировка кнопки, красное сообщение об ошибке
+- Cookies сохраняются в `.cookies.txt` (_BASE_DIR), используются yt-dlp через `--cookies`
+
+**pywebview нюанс**: тултипы через JS `onmouseenter`/`onmouseleave` (CSS `:hover` не работает)
+
+### 6.6. Локализация
 
 Интерфейс полностью на русском языке.
 
@@ -407,4 +425,4 @@ instrumentarium/
 
 ---
 
-*Последнее обновление: 2026-05-30*
+*Последнее обновление: 2026-05-31*

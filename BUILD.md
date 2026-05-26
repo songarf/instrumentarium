@@ -73,6 +73,7 @@ instrumentarium/
 ├── instrumentarium.log         # Лог приложения (debug level)
 ├── .setup_done                 # Маркёр завершённой настройки (timestamp)
 ├── .instrumentarium.lock       # Lock-файл для единственного инстанса
+├── .cookies.txt                # Cookies файл (LinkedIn и др., в .gitignore)
 ├── .bin/                       # Скачанные бинарники
 │   ├── yt-dlp.exe              # (Windows) или yt-dlp (Linux/macOS)
 │   ├── ffmpeg.exe              # (Windows, скачивается автоматически)
@@ -327,6 +328,19 @@ Download Thread (daemon, server.py → JobLogger)
 - **Подпапки:** `youtube/`, `twitter/`, `tiktok/`, `instagram/`, `facebook/`, `linkedin/`, `other/`
 - **Формат файлов:** `%(title).120s [%(id)s].%(ext)s` (ограничение 120 символов)
 
+### 6.6. Cookies файл: `.cookies.txt`
+- **Расположение:** `_BASE_DIR/.cookies.txt`
+- **Назначение:** авторизация на платформах, требующих вход (LinkedIn и др.)
+- **Формат:** Netscape HTTP Cookie File
+- **Управление:** через диалог 🍪 Cookies в UI (drag & drop, вставка текста, очистка)
+- **Использование:** yt-dlp `--cookies .cookies.txt` при каждом запросе
+- **В .gitignore**: да, не коммитится
+
+### 6.7. Папка `downloads/`
+- **Расположение:** `_BASE_DIR/downloads/`
+- **Подпапки:** `youtube/`, `twitter/`, `tiktok/`, `instagram/`, `facebook/`, `linkedin/`, `other/`
+- **Формат файлов:** `%(title).120s [%(id)s].%(ext)s` (ограничение 120 символов)
+
 ---
 
 ## 7. Форматы видео/аудио
@@ -505,7 +519,11 @@ python -m pytest tests/ -v
 - /probe endpoint: динамические кнопки форматов на основе yt-dlp
 - Компактный UI: уменьшены отступы и размеры для помещения в экран
 - display_label: корректные названия кнопок для всех платформ (DASH, SD/HD, разрешение)
-- Ограничение длины имени файла: 120 символов для совместимости с Windows
+- Ограничение длины имени файла: 120 символы для совместимости с Windows
+- **Cookies система**: drag & drop / вставка cookies.txt через диалог 🍪, LinkedIn авторизация
+- **?-тултипы**: CSS hover не работает в pywebview → JS `onmouseenter`/`onmouseleave`
+- **Визуальный фидбек кнопок**: `transform: scale(.96)` при `:active`, блокировка кнопки во время запроса
+- **Автозакрытие** cookies dialog после успешного сохранения (1.2с)
 
 ### ⬜ Планы
 - Расширить тесты: HTTP-эндпоинты, setup wizard, JobLogger
