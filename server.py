@@ -544,6 +544,37 @@ def _find_ytdlp():
             return candidate
     return shutil.which("yt-dlp") or shutil.which("yt-dlp.exe")
 
+
+def _map_ytdlp_error(err_text):
+    """Map yt-dlp error output to a user-friendly Russian message."""
+    err = (err_text or "").lower()
+    if "unsupported url" in err:
+        return "Неправильная ссылка или сайт не поддерживается"
+    if "video unavailable" in err or "content is not available" in err:
+        return "Видео недоступно или удалено"
+    if "private video" in err or "private" in err:
+        return "Видео приватное — нужны cookies для доступа"
+    if "login" in err or "sign in" in err or "authentication" in err:
+        return "Требуется вход в аккаунт — загрузите cookies"
+    if "blocked" in err or "banned" in err or "403" in err:
+        return "Доступ заблокирован — попробуйте позже или используйте cookies"
+    if "404" in err or "not found" in err:
+        return "Страница не найдена (404)"
+    if "429" in err or "rate limit" in err or "too many requests" in err:
+        return "Слишком много запросов — подождите и попробуйте снова"
+    if "network" in err or "connection" in err or "timeout" in err:
+        return "Ошибка сети — проверьте подключение к интернету"
+    if "geo" in err or "region" in err or "country" in err:
+        return "Видео недоступно в вашем регионе"
+    if "removed" in err or "deleted" in err:
+        return "Видео было удалено"
+    if "copyright" in err or "dmca" in err:
+        return "Видео заблокировано по запросу правообладателя"
+    if "age" in err or "restricted" in err:
+        return "Видео с возрастным ограничением — нужны cookies"
+    # Fallback: return a generic friendly message
+    return "Не удалось обработать ссылку — проверьте правильность или попробуйте позже"
+
 # ── HTTP handler ────────────────────────────────────────────────────
 class Handler(http.server.BaseHTTPRequestHandler):
     def do_GET(self):
@@ -627,7 +658,9 @@ class Handler(http.server.BaseHTTPRequestHandler):
                 if proc.returncode != 0:
                     err_text = stdout_data[:500] if stdout_data else "(no output)"
                     log.warning("/probe: yt-dlp exit=%d output=%s", proc.returncode, err_text)
-                    self._json({"error": "Failed to probe video", "details": err_text})
+                    # Map yt-dlp errors to user-friendly messages
+                    friendly = _map_ytdlp_error(err_text)
+                    self._json({"error": friendly, "details": err_text})
                     return
                 if not stdout_data or not stdout_data.strip():
                     self._json({"error": "Empty response from yt-dlp"})

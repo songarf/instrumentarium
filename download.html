@@ -449,7 +449,8 @@ function doProbe(url) {
       hideProbing();
       probeAbort = null;
       if (data.error) {
-        showError('Ошибка', data.error);
+        // Server already returns a user-friendly message in data.error
+        showError(data.error, null);
         return;
       }
       probedFormats = data.formats || [];
@@ -701,7 +702,13 @@ let dlPoll = null;
 
 function showError(title, message) {
   document.getElementById('errorTitle').textContent = title;
-  document.getElementById('errorMessage').textContent = message;
+  var msgEl = document.getElementById('errorMessage');
+  if (message) {
+    msgEl.textContent = message;
+    msgEl.style.display = '';
+  } else {
+    msgEl.style.display = 'none';
+  }
   document.getElementById('dlProgress').style.display = 'block';
   document.getElementById('errorToast').classList.add('visible');
 }
