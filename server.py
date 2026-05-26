@@ -734,15 +734,20 @@ class Handler(http.server.BaseHTTPRequestHandler):
                         seen_res.add(bucket)
                         unique_formats.append(f)
                 # Deduplicate audio formats by bitrate (keep highest quality per bitrate)
+                # Skip formats with unknown bitrate (e.g. HLS segments with abr=None)
                 seen_abr = set()
                 unique_audio = []
                 audio_formats.sort(key=lambda x: (-x["abr"], -x["filesize"]))
                 for af in audio_formats:
+                    if af["abr"] <= 0:
+                        continue  # skip unknown bitrate
                     # Round abr to nearest 16kbps for dedup
-                    abr_key = round(af["abr"] / 16) * 16 if af["abr"] > 0 else 0
+                    abr_key = round(af["abr"] / 16) * 16
                     if abr_key not in seen_abr:
                         seen_abr.add(abr_key)
                         unique_audio.append(af)
+                # Limit to 3 best audio formats
+                unique_audio = unique_audio[:3]
                 self._json({
                     "title": title,
                     "duration": duration,
@@ -750,7 +755,7 @@ class Handler(http.server.BaseHTTPRequestHandler):
                     "formats": unique_formats,
                     "audio_formats": unique_audio,
                 })
-                log.info("/probe: found %d unique resolutions for '%s'", len(unique_formats), title)
+                log.info("/probe: found %d video, %d unique audio for '%s'", len(unique_formats), len(unique_audio), title)
             except Exception as e:
                 log.error("/probe: exception: %s", e, exc_info=True)
                 self._json({"error": str(e)})

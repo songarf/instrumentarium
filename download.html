@@ -418,6 +418,14 @@ function doProbe(url) {
       probedFormats = data.formats || [];
       probedAudioFormats = data.audio_formats || [];
       probedTitle = data.title || '';
+      // If no formats at all — video is unavailable
+      if (!probedFormats.length && !probedAudioFormats.length) {
+        showError('Ошибка', 'Неправильная ссылка или видео недоступно');
+        hideResButtons();
+        document.getElementById('modeRow').classList.add('hidden');
+        document.getElementById('videoTitle').classList.remove('visible');
+        return;
+      }
       document.getElementById('videoTitle').textContent = '📹 ' + probedTitle;
       document.getElementById('videoTitle').classList.add('visible');
       document.getElementById('modeRow').classList.remove('hidden');
@@ -448,7 +456,7 @@ function renderResButtons() {
       // No separate audio streams — offer bestaudio/best fallback (ffmpeg will extract)
       const btn = document.createElement('button');
       btn.className = 'res-btn';
-      btn.innerHTML = `<span class="res-label">🎵 MP3 (из видео)</span><span class="res-meta">Лучшее качество · MP3</span>`;
+      btn.innerHTML = `<span class="res-label">🎵 Скачать аудио</span><span class="res-meta">Лучшее качество · MP3</span>`;
       btn.onclick = () => startDownloadBestAudio();
       audioContainer.appendChild(btn);
       return;
@@ -471,6 +479,9 @@ function renderResButtons() {
   container.classList.remove('hidden');
   if (!probedFormats.length) {
     container.classList.add('hidden');
+    if (!probedAudioFormats.length) {
+      showError('Ошибка', 'Неправильная ссылка или видео недоступно');
+    }
     return;
   }
   container.innerHTML = '';
