@@ -186,6 +186,7 @@ try:
         width=620,
         height=720,
         resizable=False,
+        debug=os.environ.get("INSTRUMENTARIUM_DEBUG", "0") == "1",
     )
 
     if window:
