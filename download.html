@@ -214,16 +214,6 @@
     margin-top: 12px; font-size: .68rem; color: #444; text-align: center;
   }
 
-  /* ── Status bar under input ──────────────────────────────── */
-  .status-bar {
-    margin-top: 8px; font-size: .72rem; color: #666; text-align: center;
-    min-height: 1.2em;
-  }
-  .status-bar .status-text { transition: color .2s; }
-  .status-bar.error .status-text { color: #ff4757; }
-  .status-bar.success .status-text { color: #4caf50; }
-  .status-bar.working .status-text { color: #6c5ce7; }
-
   /* ── Cookie tooltip on hover ─────────────────────────────── */
 
   /* ── Cookie tooltip on hover ─────────────────────────────── */
@@ -321,11 +311,6 @@
     </div>
 
     <!-- Big Downloads button at bottom -->
-    <!-- Status bar: shown under input, reflects current state -->
-    <div class="status-bar" id="statusBar">
-      <span class="status-text" id="statusText">Готово к работе ✅</span>
-    </div>
-
     <button class="big-downloads-btn" onclick="openFolder()">📁 Загрузки</button>
 
     <p class="footer">
@@ -404,15 +389,6 @@ function _human(n) {
   return n.toFixed(1) + ' TB';
 }
 
-/* ── Status bar ───────────────────────────────────────────── */
-function setStatus(text, type) {
-  const bar = document.getElementById('statusBar');
-  const txt = document.getElementById('statusText');
-  if (!bar || !txt) return;
-  txt.textContent = text;
-  bar.className = 'status-bar' + (type ? ' ' + type : '');
-}
-
 /* ── Platform detect ─────────────────────────────────────── */
 function detectPlatform(url) {
   const u = url.toLowerCase();
@@ -465,7 +441,6 @@ function scheduleProbe(url) {
 function doProbe(url) {
   if (!isValidUrl(url)) return;
   showProbing();
-  setStatus('⏳ Проверяю ссылку…', 'working');
   probeAbort = new AbortController();
   fetch('/probe?url=' + encodeURIComponent(url), { signal: probeAbort.signal })
     .then(r => r.json())
@@ -474,7 +449,6 @@ function doProbe(url) {
       probeAbort = null;
       if (data.error) {
         showError('Ошибка', data.error);
-        setStatus('❌ ' + data.error, 'error');
         return;
       }
       probedFormats = data.formats || [];
@@ -486,11 +460,8 @@ function doProbe(url) {
         hideResButtons();
         document.getElementById('modeRow').classList.add('hidden');
         document.getElementById('videoTitle').classList.remove('visible');
-        setStatus('❌ Неправильная ссылка или видео недоступно', 'error');
         return;
       }
-      const count = probedFormats.length + probedAudioFormats.length;
-      setStatus('✅ Найдено ' + count + ' форматов', 'success');
       document.getElementById('videoTitle').textContent = '📹 ' + probedTitle;
       document.getElementById('videoTitle').classList.add('visible');
       document.getElementById('modeRow').classList.remove('hidden');
@@ -770,8 +741,6 @@ function _startDownload(url, dlMode, formatId, height) {
   dlBar.style.width = '5%';
   dlBar.classList.remove('done');
   document.getElementById('dlStatus').textContent = 'Запуск…';
-  const label = (dlMode === 'audio') ? 'аудио (MP3)' : (height ? height + 'p видео' : 'видео');
-  setStatus('📥 Скачиваю ' + label + '…', 'working');
 
   // Disable resolution buttons
   document.querySelectorAll('.res-btn, .big-downloads-btn').forEach(b => b.disabled = true);
@@ -821,9 +790,8 @@ function _startDownload(url, dlMode, formatId, height) {
             document.getElementById('dlBar').classList.add('done');
             if (d.status === 'done') {
               document.getElementById('dlStatus').textContent = '✅ Готово!';
-              setStatus('✅ Скачивание завершено', 'success');
             } else {
-              setStatus('❌ Ошибка при скачивании', 'error');
+              document.getElementById('dlStatus').textContent = '❌ Ошибка загрузки';
             }
             enableDlButtons();
           } else {
@@ -863,8 +831,16 @@ function saveCookies() {
     status.style.color = '#ff4757';
     return;
   }
-  // Send as base64 to handle special chars safely
-  const b64 = btoa(unescape(encodeURIComponent(content)));
+  status.textContent = '⏳ Сохраняю…';
+  status.style.color = '#6c5ce7';
+  let b64;
+  try {
+    b64 = btoa(unescape(encodeURIComponent(content)));
+  } catch(e) {
+    status.textContent = '❌ Ошибка кодирования: ' + e.message;
+    status.style.color = '#ff4757';
+    return;
+  }
   fetch('/cookies', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
