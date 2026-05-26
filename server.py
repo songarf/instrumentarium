@@ -696,8 +696,8 @@ class Handler(http.server.BaseHTTPRequestHandler):
                         res_label = format_note
                     elif eff_height > 0:
                         res_label = f"{eff_height}p"
-                    elif format_id:
-                        res_label = format_id.upper()
+                    elif format_id and str(format_id) not in ("0", ""):
+                        res_label = str(format_id).upper()
                     else:
                         res_label = "Скачать видео"
                     # Skip formats with completely unknown resolution (no height, no width, no note)
