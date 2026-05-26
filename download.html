@@ -216,13 +216,11 @@
 
   /* ── Cookie tooltip on hover ─────────────────────────────── */
 
-  /* ── Cookie tooltip on hover ─────────────────────────────── */
-  .cookie-tooltip-anchor:hover .cookie-tooltip {
-    display: block;
-  }
-  .cookie-help-anchor:hover ~ .cookie-help-tooltip,
-  .cookie-help-anchor:hover .cookie-help-tooltip {
-    display: block;
+  /* ── Tooltip animations ───────────────────────────────────── */
+  @keyframes shake {
+    0%, 100% { transform: translateX(0); }
+    25% { transform: translateX(-4px); }
+    75% { transform: translateX(4px); }
   }
 
   /* ── Video title shown after probe ──────────────────────── */
@@ -826,19 +824,30 @@ function closeCookiesDialog() {
 function saveCookies() {
   const content = document.getElementById('cookiesContent').value.trim();
   const status = document.getElementById('cookiesStatus');
+  const btn = document.querySelector('#cookiesDialog .btn-primary');
   if (!content) {
     status.textContent = '❌ Вставьте содержимое cookies.txt';
     status.style.color = '#ff4757';
+    // Shake the textarea to indicate error
+    const ta = document.getElementById('cookiesContent');
+    ta.style.animation = 'none';
+    ta.offsetHeight; // reflow
+    ta.style.animation = 'shake .3s ease';
     return;
   }
-  status.textContent = '⏳ Сохраняю…';
-  status.style.color = '#6c5ce7';
+  // Visual feedback: disable button, show spinner
+  if (btn) {
+    btn.disabled = true;
+    btn.textContent = '⏳ Сохраняю…';
+    btn.style.opacity = '.7';
+  }
   let b64;
   try {
     b64 = btoa(unescape(encodeURIComponent(content)));
   } catch(e) {
     status.textContent = '❌ Ошибка кодирования: ' + e.message;
     status.style.color = '#ff4757';
+    if (btn) { btn.disabled = false; btn.textContent = 'Сохранить'; btn.style.opacity = '1'; }
     return;
   }
   fetch('/cookies', {
@@ -846,23 +855,24 @@ function saveCookies() {
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ content: b64 })
   })
-  .then(r => {
-    status.textContent = '⏳ Сервер ответил (' + r.status + '), читаю…';
-    status.style.color = '#6c5ce7';
-    return r.json();
-  })
+  .then(r => r.json())
   .then(data => {
     if (data.ok) {
       status.textContent = '✅ Cookies сохранены (' + content.split('\n').length + ' строк)';
       status.style.color = '#4caf50';
+      if (btn) { btn.textContent = '✅ Готово'; btn.style.opacity = '1'; }
+      // Auto-close after 1.2s
+      setTimeout(() => closeCookiesDialog(), 1200);
     } else {
       status.textContent = '❌ ' + (data.error || 'Ошибка сервера');
       status.style.color = '#ff4757';
+      if (btn) { btn.disabled = false; btn.textContent = 'Сохранить'; btn.style.opacity = '1'; }
     }
   })
   .catch(err => {
     status.textContent = '❌ Ошибка: ' + err.message;
     status.style.color = '#ff4757';
+    if (btn) { btn.disabled = false; btn.textContent = 'Сохранить'; btn.style.opacity = '1'; }
   });
 }
 
@@ -934,6 +944,24 @@ function clearCookies() {
       status.style.color = '#ff4757';
     };
     reader.readAsText(file);
+  }
+})();
+
+/* ── Tooltip handlers (pywebview doesn't fully support CSS :hover) ─── */
+(function() {
+  // Footer cookie tooltip
+  var footerAnchor = document.querySelector('.cookie-tooltip-anchor');
+  var footerTip = document.querySelector('.cookie-tooltip');
+  if (footerAnchor && footerTip) {
+    footerAnchor.onmouseenter = function() { footerTip.style.display = 'block'; };
+    footerAnchor.onmouseleave = function() { footerTip.style.display = 'none'; };
+  }
+  // Dialog cookie help tooltip
+  var helpAnchor = document.querySelector('.cookie-help-anchor');
+  var helpTip = document.querySelector('.cookie-help-tooltip');
+  if (helpAnchor && helpTip) {
+    helpAnchor.onmouseenter = function() { helpTip.style.display = 'block'; };
+    helpAnchor.onmouseleave = function() { helpTip.style.display = 'none'; };
   }
 })();
 
