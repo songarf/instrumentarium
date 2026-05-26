@@ -139,6 +139,9 @@
   .opt-btn.active { border-color: #6c5ce7; background: #1a1040; color: #a78bfa; }
   .opt-btn .icon { font-size: 1.3rem; display: block; margin-bottom: 3px; }
 
+  /* ── Hidden utility ──────────────────────────────────────── */
+  .hidden { display: none !important; }
+
   /* ── Download buttons container (video res / audio) ──────── */
   .dl-options {
     min-height: 120px;
@@ -415,7 +418,9 @@ function renderResButtons() {
   const audioContainer = document.getElementById('audioButtons');
   if (mode === 'audio') {
     resContainer.innerHTML = '';
+    resContainer.classList.add('hidden');
     audioContainer.innerHTML = '';
+    audioContainer.classList.remove('hidden');
     if (!probedAudioFormats || !probedAudioFormats.length) {
       return;
     }
@@ -432,7 +437,9 @@ function renderResButtons() {
   }
   // video mode
   audioContainer.innerHTML = '';
+  audioContainer.classList.add('hidden');
   const container = document.getElementById('resButtons');
+  container.classList.remove('hidden');
   if (!probedFormats.length) {
     container.classList.add('hidden');
     return;
