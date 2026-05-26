@@ -234,6 +234,13 @@
   /* ── Transitions ────────────────────────────────────────── */
   .fade-in { animation: fadeIn .4s ease; }
   @keyframes fadeIn { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
+
+  /* ── Button press animation ──────────────────────────────── */
+  .btn:active, .btn-primary:active {
+    transform: scale(.96);
+    transition: transform .1s ease;
+  }
+  .btn, .btn-primary { transition: transform .1s ease, opacity .2s ease; }
 </style>
 </head>
 <body>
@@ -328,10 +335,6 @@
       <p style="font-size:.78rem;color:#888;margin-bottom:6px;line-height:1.5;">
         Перетащите файл cookies.txt или нажмите на область ниже. Также можно вставить текст вручную.
       </p>
-      <p style="font-size:.72rem;color:#666;margin-bottom:12px;line-height:1.4;">
-        Как получить: расширение <strong>"Get cookies.txt LOCALLY"</strong> → linkedin.com → Export.
-      </p>
-
       <!-- Drag & drop zone -->
       <div id="cookieDropzone"
            onclick="document.getElementById('cookieFileInput').click()"
@@ -345,14 +348,14 @@
         style="width:100%;background:#12122a;border:1px solid #2a2a4a;border-radius:10px;padding:10px 14px;color:#e0e0e0;font-size:.78rem;outline:none;margin-bottom:12px;resize:vertical;font-family:monospace;box-sizing:border-box;"></textarea>
       <!-- Cookie help tooltip -->
       <div style="position:relative;display:inline-block;margin-bottom:12px;">
-        <span class="cookie-help-anchor" style="display:inline-flex;align-items:center;justify-content:center;width:16px;height:16px;border-radius:50%;border:1px solid #555;font-size:.6rem;color:#888;cursor:help;vertical-align:middle;">?</span>
-        <span style="font-size:.72rem;color:#666;margin-left:6px;">Как получить cookies.txt</span>
+        <span style="font-size:.72rem;color:#666;">Как получить cookies.txt</span>
+        <span class="cookie-help-anchor" style="display:inline-flex;align-items:center;justify-content:center;width:16px;height:16px;border-radius:50%;border:1px solid #555;font-size:.6rem;color:#888;cursor:help;vertical-align:middle;margin-left:4px;">?</span>
         <span class="cookie-help-tooltip" style="display:none;position:absolute;bottom:140%;left:0;background:#1a1a2e;border:1px solid #2a2a4a;border-radius:8px;padding:10px 14px;font-size:.7rem;color:#ccc;width:260px;line-height:1.5;box-shadow:0 4px 16px rgba(0,0,0,.4);z-index:100;pointer-events:none;">Установите расширение <strong>Get cookies.txt LOCALLY</strong> → откройте linkedin.com → нажмите на расширение → <strong>Export</strong> → перетащите файл сюда</span>
       </div>
       <div style="display:flex;gap:8px;justify-content:flex-end;">
-        <button onclick="closeCookiesDialog()" style="padding:10px 20px;background:none;border:1px solid #2a2a4a;border-radius:10px;color:#888;cursor:pointer;font-size:.85rem;">Отмена</button>
-        <button onclick="clearCookies()" style="padding:10px 20px;background:none;border:1px solid #ff4757;border-radius:10px;color:#ff4757;cursor:pointer;font-size:.85rem;">Очистить</button>
-        <button onclick="saveCookies()" style="padding:10px 20px;background:linear-gradient(135deg,#6c5ce7,#a78bfa);border:none;border-radius:10px;color:#fff;cursor:pointer;font-size:.85rem;font-weight:600;">Сохранить</button>
+        <button class="btn" onclick="closeCookiesDialog()" style="padding:10px 20px;background:none;border:1px solid #2a2a4a;border-radius:10px;color:#888;cursor:pointer;font-size:.85rem;">Отмена</button>
+        <button class="btn" onclick="clearCookies()" style="padding:10px 20px;background:none;border:1px solid #ff4757;border-radius:10px;color:#ff4757;cursor:pointer;font-size:.85rem;">Очистить</button>
+        <button class="btn btn-primary" onclick="saveCookies()" style="padding:10px 20px;background:linear-gradient(135deg,#6c5ce7,#a78bfa);border:none;border-radius:10px;color:#fff;cursor:pointer;font-size:.85rem;font-weight:600;">Сохранить</button>
       </div>
       <p id="cookiesStatus" style="font-size:.72rem;color:#666;margin-top:10px;"></p>
     </div>
