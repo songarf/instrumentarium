@@ -214,8 +214,24 @@
     margin-top: 12px; font-size: .68rem; color: #444; text-align: center;
   }
 
+  /* ── Status bar under input ──────────────────────────────── */
+  .status-bar {
+    margin-top: 8px; font-size: .72rem; color: #666; text-align: center;
+    min-height: 1.2em;
+  }
+  .status-bar .status-text { transition: color .2s; }
+  .status-bar.error .status-text { color: #ff4757; }
+  .status-bar.success .status-text { color: #4caf50; }
+  .status-bar.working .status-text { color: #6c5ce7; }
+
+  /* ── Cookie tooltip on hover ─────────────────────────────── */
+
   /* ── Cookie tooltip on hover ─────────────────────────────── */
   .cookie-tooltip-anchor:hover .cookie-tooltip {
+    display: block;
+  }
+  .cookie-help-anchor:hover ~ .cookie-help-tooltip,
+  .cookie-help-anchor:hover .cookie-help-tooltip {
     display: block;
   }
 
@@ -305,6 +321,11 @@
     </div>
 
     <!-- Big Downloads button at bottom -->
+    <!-- Status bar: shown under input, reflects current state -->
+    <div class="status-bar" id="statusBar">
+      <span class="status-text" id="statusText">Готово к работе ✅</span>
+    </div>
+
     <button class="big-downloads-btn" onclick="openFolder()">📁 Загрузки</button>
 
     <p class="footer">
@@ -312,7 +333,6 @@
       <span class="cookie-tooltip-anchor" style="display:inline-flex;align-items:center;justify-content:center;width:18px;height:18px;border-radius:50%;border:1px solid #555;font-size:.65rem;color:#888;cursor:help;margin-left:4px;vertical-align:middle;position:relative;">?
         <span class="cookie-tooltip" style="display:none;position:absolute;bottom:140%;left:50%;transform:translateX(-50%);background:#1a1a2e;border:1px solid #2a2a4a;border-radius:8px;padding:8px 12px;font-size:.7rem;color:#ccc;width:220px;text-align:center;line-height:1.4;box-shadow:0 4px 16px rgba(0,0,0,.4);z-index:100;pointer-events:none;">Используйте cookies, чтобы скачать видео из приватных страниц, доступных только после входа в аккаунт</span>
       </span>
-      · Готово к работе ✅
     </p>
   </div>
 
@@ -338,19 +358,14 @@
         <input type="file" id="cookieFileInput" accept=".txt,text/plain" style="display:none">
       </div>
 
-      <!-- How to get cookies -->
-      <details style="margin-bottom:12px;font-size:.75rem;color:#666;">
-        <summary style="cursor:pointer;color:#888;padding:4px 0;">📖 Как получить cookies.txt</summary>
-        <ol style="margin:8px 0 0 16px;padding:0;line-height:1.6;">
-          <li>Установите расширение <strong>"Get cookies.txt LOCALLY"</strong> в Chrome/Edge</li>
-          <li>Откройте <strong>linkedin.com</strong> и войдите в аккаунт</li>
-          <li>Нажмите на иконку расширения → <strong>Export</strong></li>
-          <li>Файл cookies.txt сохранится на ваш компьютер — перетащите его сюда</li>
-        </ol>
-      </details>
-
       <textarea id="cookiesContent" rows="4" placeholder="…или вставьте содержимое cookies.txt сюда"
         style="width:100%;background:#12122a;border:1px solid #2a2a4a;border-radius:10px;padding:10px 14px;color:#e0e0e0;font-size:.78rem;outline:none;margin-bottom:12px;resize:vertical;font-family:monospace;box-sizing:border-box;"></textarea>
+      <!-- Cookie help tooltip -->
+      <div style="position:relative;display:inline-block;margin-bottom:12px;">
+        <span class="cookie-help-anchor" style="display:inline-flex;align-items:center;justify-content:center;width:16px;height:16px;border-radius:50%;border:1px solid #555;font-size:.6rem;color:#888;cursor:help;vertical-align:middle;">?</span>
+        <span style="font-size:.72rem;color:#666;margin-left:6px;">Как получить cookies.txt</span>
+        <span class="cookie-help-tooltip" style="display:none;position:absolute;bottom:140%;left:0;background:#1a1a2e;border:1px solid #2a2a4a;border-radius:8px;padding:10px 14px;font-size:.7rem;color:#ccc;width:260px;line-height:1.5;box-shadow:0 4px 16px rgba(0,0,0,.4);z-index:100;pointer-events:none;">Установите расширение <strong>Get cookies.txt LOCALLY</strong> → откройте linkedin.com → нажмите на расширение → <strong>Export</strong> → перетащите файл сюда</span>
+      </div>
       <div style="display:flex;gap:8px;justify-content:flex-end;">
         <button onclick="closeCookiesDialog()" style="padding:10px 20px;background:none;border:1px solid #2a2a4a;border-radius:10px;color:#888;cursor:pointer;font-size:.85rem;">Отмена</button>
         <button onclick="clearCookies()" style="padding:10px 20px;background:none;border:1px solid #ff4757;border-radius:10px;color:#ff4757;cursor:pointer;font-size:.85rem;">Очистить</button>
@@ -387,6 +402,15 @@ function _human(n) {
   const u = ['B','KB','MB','GB'];
   for (const s of u) { if (n < 1024) return n.toFixed(1) + ' ' + s; n /= 1024; }
   return n.toFixed(1) + ' TB';
+}
+
+/* ── Status bar ───────────────────────────────────────────── */
+function setStatus(text, type) {
+  const bar = document.getElementById('statusBar');
+  const txt = document.getElementById('statusText');
+  if (!bar || !txt) return;
+  txt.textContent = text;
+  bar.className = 'status-bar' + (type ? ' ' + type : '');
 }
 
 /* ── Platform detect ─────────────────────────────────────── */
@@ -441,6 +465,7 @@ function scheduleProbe(url) {
 function doProbe(url) {
   if (!isValidUrl(url)) return;
   showProbing();
+  setStatus('⏳ Проверяю ссылку…', 'working');
   probeAbort = new AbortController();
   fetch('/probe?url=' + encodeURIComponent(url), { signal: probeAbort.signal })
     .then(r => r.json())
@@ -449,6 +474,7 @@ function doProbe(url) {
       probeAbort = null;
       if (data.error) {
         showError('Ошибка', data.error);
+        setStatus('❌ ' + data.error, 'error');
         return;
       }
       probedFormats = data.formats || [];
@@ -460,8 +486,11 @@ function doProbe(url) {
         hideResButtons();
         document.getElementById('modeRow').classList.add('hidden');
         document.getElementById('videoTitle').classList.remove('visible');
+        setStatus('❌ Неправильная ссылка или видео недоступно', 'error');
         return;
       }
+      const count = probedFormats.length + probedAudioFormats.length;
+      setStatus('✅ Найдено ' + count + ' форматов', 'success');
       document.getElementById('videoTitle').textContent = '📹 ' + probedTitle;
       document.getElementById('videoTitle').classList.add('visible');
       document.getElementById('modeRow').classList.remove('hidden');
@@ -741,6 +770,8 @@ function _startDownload(url, dlMode, formatId, height) {
   dlBar.style.width = '5%';
   dlBar.classList.remove('done');
   document.getElementById('dlStatus').textContent = 'Запуск…';
+  const label = (dlMode === 'audio') ? 'аудио (MP3)' : (height ? height + 'p видео' : 'видео');
+  setStatus('📥 Скачиваю ' + label + '…', 'working');
 
   // Disable resolution buttons
   document.querySelectorAll('.res-btn, .big-downloads-btn').forEach(b => b.disabled = true);
@@ -790,6 +821,9 @@ function _startDownload(url, dlMode, formatId, height) {
             document.getElementById('dlBar').classList.add('done');
             if (d.status === 'done') {
               document.getElementById('dlStatus').textContent = '✅ Готово!';
+              setStatus('✅ Скачивание завершено', 'success');
+            } else {
+              setStatus('❌ Ошибка при скачивании', 'error');
             }
             enableDlButtons();
           } else {
