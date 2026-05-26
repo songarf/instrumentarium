@@ -1,0 +1,78 @@
+{
+  "meta": {
+    "description": "UI configuration for Instrumentarium download.html. Edit values below to adjust the UI without touching HTML/CSS.",
+    "version": 1
+  },
+
+  "window": {
+    "width": 620,
+    "height": 720,
+    "resizable": false
+  },
+
+  "colors": {
+    "bg": "#0f0f1a",
+    "card_bg": "#1a1a2e",
+    "card_border": "#2a2a4a",
+    "text": "#e0e0e0",
+    "text_muted": "#666666",
+    "text_dim": "#888888",
+    "accent_from": "#6c5ce7",
+    "accent_to": "#a78bfa",
+    "success": "#4caf50",
+    "error": "#ff4757",
+    "input_bg": "#12122a"
+  },
+
+  "card": {
+    "padding": 24,
+    "width": 540,
+    "max_width_vw": 95,
+    "border_radius": 16
+  },
+
+  "typography": {
+    "title_size": "1.2rem",
+    "subtitle_size": "0.78rem",
+    "label_size": "0.72rem",
+    "footer_size": "0.68rem",
+    "res_btn_label_size": "0.95rem",
+    "res_btn_meta_size": "0.75rem"
+  },
+
+  "spacing": {
+    "input_gap": 6,
+    "card_margin_bottom": 16,
+    "setup_desc_margin_bottom": 18,
+    "progress_section_margin_top": 24,
+    "dl_options_min_height": 120,
+    "res_btns_gap": 8,
+    "footer_margin_top": 12,
+    "url_row_margin_bottom": 8,
+    "badge_margin_bottom": 10,
+    "options_margin_bottom": 10,
+    "big_btn_margin_top": 12,
+    "dl_progress_margin_top": 12,
+    "error_toast_margin_top": 12
+  },
+
+  "setup_screen": {
+    "icon_size": "2.5rem",
+    "icon_animation_duration": "2s",
+    "title_size": "1rem",
+    "desc_size": "0.78rem",
+    "btn_padding_v": 12,
+    "btn_padding_h": 28,
+    "btn_radius": 12
+  },
+
+  "platforms": {
+    "youtube":   { "emoji": "🔴", "label": "YouTube",        "color": "#ff4757" },
+    "twitter":   { "emoji": "🐦", "label": "Twitter/X",      "color": "#1da1f2" },
+    "tiktok":    { "emoji": "🎵", "label": "TikTok",         "color": "#ff0050" },
+    "instagram": { "emoji": "📸", "label": "Instagram",      "color": "#e1306c" },
+    "facebook":  { "emoji": "📘", "label": "Facebook",       "color": "#1877f2" },
+    "linkedin":  { "emoji": "💼", "label": "LinkedIn",       "color": "#0077b5" },
+    "other":     { "emoji": "🌐", "label": "Другое",         "color": "#a78bfa" }
+  }
+}

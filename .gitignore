@@ -45,4 +45,6 @@ auth.json
 # Project context (local notes)
 CONTEXT.md
 ONBOARDING.md
-ONBOARDING.md
+
+# UI config (local tuning, not for distribution)
+ui-config.json
