@@ -214,6 +214,11 @@
     margin-top: 12px; font-size: .68rem; color: #444; text-align: center;
   }
 
+  /* ── Cookie tooltip on hover ─────────────────────────────── */
+  .cookie-tooltip-anchor:hover .cookie-tooltip {
+    display: block;
+  }
+
   /* ── Video title shown after probe ──────────────────────── */
   .video-title {
     display: none; font-size: .8rem; color: #ccc; margin-bottom: 8px;
@@ -304,6 +309,9 @@
 
     <p class="footer">
       <span onclick="showCookiesDialog()" style="cursor:pointer;text-decoration:underline;">🍪 Cookies</span>
+      <span class="cookie-tooltip-anchor" style="display:inline-flex;align-items:center;justify-content:center;width:18px;height:18px;border-radius:50%;border:1px solid #555;font-size:.65rem;color:#888;cursor:help;margin-left:4px;vertical-align:middle;position:relative;">?
+        <span class="cookie-tooltip" style="display:none;position:absolute;bottom:140%;left:50%;transform:translateX(-50%);background:#1a1a2e;border:1px solid #2a2a4a;border-radius:8px;padding:8px 12px;font-size:.7rem;color:#ccc;width:220px;text-align:center;line-height:1.4;box-shadow:0 4px 16px rgba(0,0,0,.4);z-index:100;pointer-events:none;">Используйте cookies, чтобы скачать видео из приватных страниц, доступных только после входа в аккаунт</span>
+      </span>
       · Готово к работе ✅
     </p>
   </div>
