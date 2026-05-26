@@ -846,18 +846,22 @@ function saveCookies() {
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ content: b64 })
   })
-  .then(r => r.json())
+  .then(r => {
+    status.textContent = '⏳ Сервер ответил (' + r.status + '), читаю…';
+    status.style.color = '#6c5ce7';
+    return r.json();
+  })
   .then(data => {
     if (data.ok) {
       status.textContent = '✅ Cookies сохранены (' + content.split('\n').length + ' строк)';
       status.style.color = '#4caf50';
     } else {
-      status.textContent = '❌ ' + (data.error || 'Ошибка');
+      status.textContent = '❌ ' + (data.error || 'Ошибка сервера');
       status.style.color = '#ff4757';
     }
   })
   .catch(err => {
-    status.textContent = '❌ Ошибка соединения';
+    status.textContent = '❌ Ошибка: ' + err.message;
     status.style.color = '#ff4757';
   });
 }
