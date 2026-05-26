@@ -68,21 +68,11 @@ jobs:
           python -c "import shutil, os, sys; cache = os.path.join(os.environ.get('LOCALAPPDATA' if sys.platform=='win32' else 'HOME', ''), 'pyinstaller', 'bincache'); shutil.rmtree(cache, errors='ignore') if os.path.isdir(cache) else None"
           pyinstaller ${{ matrix.spec }} --clean --distpath dist --workpath build
 
-      - name: Copy download.html to dist (Windows)
-        if: runner.os == 'Windows'
-        shell: pwsh
-        run: Copy-Item "$env:GITHUB_WORKSPACE/download.html" -Destination dist/
-
-      - name: Copy download.html to dist (Linux/macOS)
-        if: runner.os != 'Windows'
-        shell: bash
-        run: cp "$GITHUB_WORKSPACE/download.html" dist/
-
-      - name: Upload dist files as artifact
+      - name: Upload binary as artifact
         uses: actions/upload-artifact@v4
         with:
           name: ${{ matrix.artifact-name }}
-          path: dist/*
+          path: dist/Instrumentarium*
           retention-days: 30
 
   release:
@@ -100,24 +90,24 @@ jobs:
       - name: Create archives
         run: |
           mkdir -p release-files
-          # Linux: exe is Instrumentarium (no extension)
-          if [ -f release-artifacts/linux/Instrumentarium ]; then
-            cd release-artifacts/linux
-            tar czf ../../release-files/Instrumentarium-linux.tar.gz Instrumentarium download.html
-            cd ../..
-          fi
-          # Windows: exe is Instrumentarium.exe
-          if [ -f release-artifacts/windows/Instrumentarium.exe ]; then
-            cd release-artifacts/windows
-            zip ../../release-files/Instrumentarium-windows.zip Instrumentarium.exe download.html
-            cd ../..
-          fi
-          # macOS
-          if [ -f release-artifacts/macos/Instrumentarium ]; then
-            cd release-artifacts/macos
-            tar czf ../../release-files/Instrumentarium-macos.tar.gz Instrumentarium download.html
-            cd ../..
-          fi
+          # Each artifact dir contains one file: Instrumentarium or Instrumentarium.exe
+          for platform in linux windows macos; do
+            src=$(find release-artifacts/$platform -name 'Instrumentarium*' -type f | head -1)
+            if [ -n "$src" ]; then
+              ext="${src##*.}"
+              if [ "$platform" = "windows" ]; then
+                # Wrap single exe in zip
+                cd "$(dirname "$src")"
+                zip ../../release-files/Instrumentarium-windows.zip "$(basename "$src")"
+                cd -
+              else
+                # Wrap single binary in tar.gz
+                cd "$(dirname "$src")"
+                tar czf ../../release-files/Instrumentarium-${platform}.tar.gz "$(basename "$src")"
+                cd -
+              fi
+            fi
+          done
           ls -la release-files/
 
       - name: Create Release
