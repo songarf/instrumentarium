@@ -60,7 +60,6 @@ def _rotate_log(log_path, keep_days=5):
 def _ensure_log_handler():
     """Make sure the server logger has at least one handler."""
     if not log.handlers and not logging.getLogger().handlers:
-        # Use same logic as app.py for base directory
         if hasattr(sys, "_MEIPASS"):
             _base = os.path.dirname(os.path.abspath(sys.executable))
         else:
@@ -69,9 +68,12 @@ def _ensure_log_handler():
         _log_path = os.path.join(_base, "instrumentarium.log")
         # Rotate old log entries (>5 days) before starting fresh
         _rotate_log(_log_path, keep_days=5)
+        # Create empty log file immediately so it exists for open-log
+        open(_log_path, "a").close()
         _fh = logging.FileHandler(_log_path, encoding="utf-8")
         _fh.setFormatter(logging.Formatter("%(asctime)s [%(levelname)s] %(message)s"))
         log.addHandler(_fh)
+        log.info("=== Server started ===")
 
 _ensure_log_handler()
 
