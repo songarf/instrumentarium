@@ -87,12 +87,19 @@ jobs:
             codesign --force --deep --sign - --entitlements assets/entitlements.plist dist/Instrumentarium.app 2>/dev/null || echo "⚠️  codesign skipped (no signing identity)"
           fi
 
+      - name: Prepare dist for upload
+        shell: bash
+        run: |
+          # Remove leftover binary from BUNDLE build (macOS leaves Instrumentarium exe beside .app)
+          if [ -f "dist/Instrumentarium" ] && [ -d "dist/Instrumentarium.app" ]; then
+            rm -f dist/Instrumentarium
+          fi
+
       - name: Upload binary as artifact
         uses: actions/upload-artifact@v4
         with:
           name: ${{ matrix.artifact-name }}
           path: |
-            dist/Instrumentarium.app
             dist/Instrumentarium*
           retention-days: 30
 
