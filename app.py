@@ -168,11 +168,21 @@ def _do_cleanup() -> None:
     """Kill yt-dlp subprocess, stop server, remove lock file."""
     log.info("_do_cleanup: running")
     try:
-        import urllib.request as _ur
-        _ur.urlopen("http://127.0.0.1:18765/shutdown", timeout=5)
-        log.info("_do_cleanup: /shutdown sent successfully")
+        # Stop the HTTP server directly instead of via HTTP call
+        import server as srv
+        if hasattr(srv, 'srv') and srv.srv:
+            srv.srv.shutdown()
+            log.info("_do_cleanup: server.shutdown() called")
     except Exception as e:
-        log.warning("_do_cleanup: could not send /shutdown: %s", e)
+        log.warning("_do_cleanup: could not stop server: %s", e)
+    # Kill active yt-dlp subprocess
+    try:
+        import server as srv
+        if srv._active_proc[0] and srv._active_proc[0].poll() is None:
+            srv._active_proc[0].kill()
+            log.info("_do_cleanup: yt-dlp killed")
+    except Exception as e:
+        log.warning("_do_cleanup: could not kill yt-dlp: %s", e)
     _cleanup_lock()
 
 
@@ -200,8 +210,8 @@ try:
             os._exit(0)
 
         window.events.closing += _on_closing
+        window.events.closed += lambda: os._exit(0)
 
-    # Also handle SIGTERM (e.g. from xdotool windowclose or kill)
     import signal as _signal
     def _sigterm_handler(signum, frame):
         log.info("=== SIGTERM received ===")
