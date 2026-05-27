@@ -39,33 +39,26 @@ _INSTALLED_HTML = os.path.join(_INSTALL_DIR, "download.html")
 _SETUP_MARKER = os.path.join(_INSTALL_DIR, ".setup_done")
 
 # ── Logging (to install dir) ─────────────────────────────────────
-logging.basicConfig(
-    level=logging.DEBUG,
-    format="%(asctime)s [%(levelname)s] %(message)s",
-    handlers=[
-        logging.FileHandler(os.path.join(_INSTALL_DIR, "instrumentarium.log"), encoding="utf-8"),
-    ],
-)
-log = logging.getLogger("instrumentarium.launcher")
-
 # ── Check if running from installed location ─────────────────────
 def _is_running_from_install_dir():
-    """Check if this executable IS the installed copy."""
+    """Check if this script is running from the installed directory."""
     if _BUNDLE_DIR:
         return False  # Running from PyInstaller temp dir
-    return os.path.normcase(os.path.dirname(_EXE_PATH)) == os.path.normcase(_INSTALL_DIR)
+    # Check both the script path and the executable path
+    _script_dir = os.path.normcase(os.path.dirname(os.path.abspath(sys.argv[0])))
+    _exe_dir = os.path.normcase(os.path.dirname(_EXE_PATH))
+    _install = os.path.normcase(_INSTALL_DIR)
+    return _script_dir == _install or _exe_dir == _install
 
 # ── Check if installation is complete ────────────────────────────
 def _is_installed():
     """Check if all required files exist in the install dir."""
-    required = [_INSTALLED_EXE, _INSTALLED_SERVER, _INSTALLED_HTML]
-    if sys.platform == "win32":
-        required.append(os.path.join(_INSTALL_DIR, "Instrumentarium.exe"))
+    required = [_INSTALLED_SERVER, _INSTALLED_HTML]
     return all(os.path.isfile(f) for f in required)
 
 # ── Extract files from bundle to install dir ─────────────────────
 def _extract_bundle():
-    """Extract all files from the PyInstaller bundle (_MEIPASS) to install dir."""
+    """Extract required files from the PyInstaller bundle to install dir."""
     log.info("Extracting bundle to: %s", _INSTALL_DIR)
     os.makedirs(_INSTALL_DIR, exist_ok=True)
 
@@ -73,69 +66,72 @@ def _extract_bundle():
         log.error("Cannot extract: _MEIPASS not available (%s)", _BUNDLE_DIR)
         return False
 
-    # Copy everything from _MEIPASS to _INSTALL_DIR
+    # Only copy the files we need, not the entire bundle (which includes
+    # all PyInstaller deps like CEF, .so files, etc.)
+    required_files = [
+        'app.py', 'server.py', 'download.html',
+        'assets/icon.png', 'assets/icon.svg', 'assets/icon.ico',
+        'assets/Info.plist', 'assets/entitlements.plist',
+    ]
+
     copied = 0
-    for item in os.listdir(_BUNDLE_DIR):
+    for item in required_files:
         src = os.path.join(_BUNDLE_DIR, item)
         dst = os.path.join(_INSTALL_DIR, item)
-        try:
-            if os.path.isfile(src):
-                shutil.copy2(src, dst)
-                copied += 1
-            elif os.path.isdir(src):
-                if os.path.isdir(dst):
-                    shutil.rmtree(dst)
-                shutil.copytree(src, dst)
-                copied += 1
-        except Exception as e:
-            log.warning("Failed to copy %s: %s", item, e)
+        if os.path.isfile(src):
+            os.makedirs(os.path.dirname(dst), exist_ok=True)
+            shutil.copy2(src, dst)
+            copied += 1
+            log.debug("Copied: %s", item)
+        else:
+            log.debug("Skipped (not in bundle): %s", item)
 
-    log.info("Extracted %d items to %s", copied, _INSTALLED_EXE)
-
-    # Make executable on Unix
-    if sys.platform != "win32":
-        for f in [_INSTALLED_EXE, _INSTALLED_SERVER]:
-            if os.path.isfile(f):
-                try:
-                    os.chmod(f, 0o755)
-                except Exception:
-                    pass
-
-    return _is_installed()
+    log.info("Extracted %d files to %s", copied, _INSTALL_DIR)
+    return copied > 0
 
 # ── Update installed files (on new .exe download) ────────────────
 def _update_if_needed():
     """Update installed files if the bundle has newer versions."""
     if not _BUNDLE_DIR:
-        return  # Running installed, no bundle to compare
+        return False
+
+    required_files = [
+        'app.py', 'server.py', 'download.html',
+        'assets/icon.png', 'assets/icon.svg', 'assets/icon.ico',
+        'assets/Info.plist', 'assets/entitlements.plist',
+    ]
 
     updated = False
-    for item in os.listdir(_BUNDLE_DIR):
+    for item in required_files:
         src = os.path.join(_BUNDLE_DIR, item)
         dst = os.path.join(_INSTALL_DIR, item)
 
         if os.path.isfile(src):
-            # Copy if file doesn't exist or is different size
             if not os.path.isfile(dst) or os.path.getsize(src) != os.path.getsize(dst):
                 try:
+                    os.makedirs(os.path.dirname(dst), exist_ok=True)
                     shutil.copy2(src, dst)
                     updated = True
                     log.info("Updated: %s", item)
                 except Exception as e:
                     log.warning("Failed to update %s: %s", item, e)
 
-    if updated and sys.platform != "win32":
-        for f in [_INSTALLED_EXE]:
-            if os.path.isfile(f):
-                try:
-                    os.chmod(f, 0o755)
-                except Exception:
-                    pass
-
     return updated
 
 # ── Main launcher logic ──────────────────────────────────────────
 def main():
+    # Setup logging now that _INSTALL_DIR is determined
+    global log
+    os.makedirs(_INSTALL_DIR, exist_ok=True)
+    logging.basicConfig(
+        level=logging.DEBUG,
+        format="%(asctime)s [%(levelname)s] %(message)s",
+        handlers=[
+            logging.FileHandler(os.path.join(_INSTALL_DIR, "instrumentarium.log"), encoding="utf-8"),
+        ],
+    )
+    log = logging.getLogger("instrumentarium.launcher")
+
     log.info("=== Instrumentarium Launcher ===")
     log.info("EXE: %s", _EXE_PATH)
     log.info("BUNDLE: %s", _BUNDLE_DIR)
@@ -159,18 +155,19 @@ def main():
                 log.error("Failed to extract bundle!")
                 sys.exit(1)
 
-        # Launch the installed copy
-        if os.path.isfile(_INSTALLED_EXE):
-            log.info("Launching installed copy: %s", _INSTALLED_EXE)
-            # Replace current process with installed copy
-            os.execv(_INSTALLED_EXE, [_INSTALLED_EXE] + sys.argv[1:])
-        else:
-            # Fallback: run from bundle
-            log.warning("Installed exe not found, running from bundle")
-            _launch_from_bundle()
+        # Launch installed copy
+        log.info("Launching installed copy from: %s", _INSTALL_DIR)
+        _launch_installed()
         return
 
-    # Case 3: No bundle, not installed (dev mode)
+    # Case 3: No bundle, not recognized as installed (dev mode or edge case)
+    # Treat as installed if we're in the install dir
+    if _is_running_from_install_dir():
+        log.info("Detected install dir via sys.argv, launching server...")
+        _launch_installed()
+        return
+
+    # Fallback: dev mode from source
     log.info("Development mode — running from source")
     _launch_from_bundle()
 

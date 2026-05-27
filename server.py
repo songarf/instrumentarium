@@ -59,7 +59,7 @@ PORT = 18765
 # ── Working directory ───────────────────────────────────────────────
 # All working files (logs, .bin, downloads, .setup_done, lock) go in the
 # installation directory. Can be overridden by the launcher (app.py).
-if "_BASE_DIR" not in dir() or "_BASE_DIR" is None:
+if not globals().get("_BASE_DIR"):
     if hasattr(sys, "_MEIPASS"):
         _BASE_DIR = os.path.dirname(os.path.abspath(sys.executable))
     else:
