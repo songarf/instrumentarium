@@ -164,18 +164,22 @@ else:
 # ── Open UI in a native app window (pywebview) ─────────────────────
 log.info("Opening window...")
 
-def _do_cleanup():
-    """Clean up server subprocesses and lock file before exit."""
+def _do_cleanup() -> None:
+    """Kill yt-dlp subprocess, stop server, remove lock file."""
     log.info("_do_cleanup: running")
-    # Kill active yt-dlp subprocess via server's shutdown endpoint
     try:
         import urllib.request as _ur
         _ur.urlopen("http://127.0.0.1:18765/shutdown", timeout=5)
         log.info("_do_cleanup: /shutdown sent successfully")
     except Exception as e:
         log.warning("_do_cleanup: could not send /shutdown: %s", e)
-    # Remove lock file
     _cleanup_lock()
+
+
+def _do_cleanup_async() -> None:
+    """Run _do_cleanup in a daemon thread so the window can close immediately."""
+    t = threading.Thread(target=_do_cleanup, daemon=True)
+    t.start()
 
 try:
     import webview
@@ -191,7 +195,7 @@ try:
     if window:
         def _on_closing():
             log.info("=== Window close event received ===")
-            _do_cleanup()
+            _do_cleanup_async()
             log.info("=== Final exit ===")
             os._exit(0)
 
@@ -201,7 +205,7 @@ try:
     import signal as _signal
     def _sigterm_handler(signum, frame):
         log.info("=== SIGTERM received ===")
-        _do_cleanup()
+        _do_cleanup_async()
         log.info("=== Final exit ===")
         os._exit(0)
     _signal.signal(_signal.SIGTERM, _sigterm_handler)
