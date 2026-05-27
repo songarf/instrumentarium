@@ -304,7 +304,7 @@ def _run_app():
 
         window = webview.create_window(
             "Instrumentarium",
-            url="http://localhost:18765",
+            url="http://127.0.0.1:18765",
             width=620,
             height=720,
             resizable=False,
@@ -312,8 +312,15 @@ def _run_app():
 
         if window:
             def _on_closing():
+                # Hide window immediately so user sees instant response
+                try:
+                    window.hide()
+                except Exception:
+                    pass
+                # Cleanup in background thread
                 t = threading.Thread(target=_do_cleanup, daemon=True)
                 t.start()
+                # Exit after brief delay to let cleanup start
                 os._exit(0)
 
             window.events.closing += _on_closing
@@ -340,7 +347,7 @@ def _run_app():
     except Exception as e:
         log.error("Could not open native window: %s", e, exc_info=True)
         import webbrowser, threading as _t
-        webbrowser.open("http://localhost:18765")
+        webbrowser.open("http://127.0.0.1:18765")
         try:
             _t.Event().wait()
         except KeyboardInterrupt:
