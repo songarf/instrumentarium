@@ -14,7 +14,10 @@ a = Analysis(
     pathex=[],
     binaries=webview_binaries,
     datas=webview_datas + [
+        ('app.py', '.'),
+        ('server.py', '.'),
         ('download.html', '.'),
+        ('assets/*', 'assets'),
     ],
     hiddenimports=webview_hiddenimports + ['bottle', 'proxy_tools'],
     hookspath=[],

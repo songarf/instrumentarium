@@ -30,7 +30,7 @@ def _get_install_dir():
         base = os.path.expanduser("~/Library/Application Support")
     else:
         base = os.path.expanduser("~")
-    return os.path.join(base, "Instrumentarium")
+    return os.path.join(base, ".instrumentarium")
 
 _INSTALL_DIR = _get_install_dir()
 _INSTALLED_EXE = os.path.join(_INSTALL_DIR, "Instrumentarium.exe" if sys.platform == "win32" else "Instrumentarium")
@@ -244,6 +244,12 @@ def _run_app():
             srv.SCRIPT_DIR = _BASE_DIR
             srv._BASE_DIR = _BASE_DIR
             srv.SETUP_MARKER = os.path.join(_BASE_DIR, ".setup_done")
+            srv.OUTPUT_BASE = os.path.join(_BASE_DIR, "downloads")
+            srv._LOCK_PATH = os.path.join(_BASE_DIR, ".instrumentarium.lock")
+            _bin_dir = os.path.join(_BASE_DIR, ".bin")
+            srv.YT_DLP_DIR = _bin_dir
+            srv.YT_DLP = os.path.join(_bin_dir, "yt-dlp.exe" if sys.platform == "win32" else "yt-dlp")
+            srv._BIN_CANDIDATES = [_bin_dir]
 
             marker_exists = os.path.exists(srv.SETUP_MARKER)
             if marker_exists:
