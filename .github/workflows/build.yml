@@ -135,11 +135,10 @@ jobs:
                 fi
               fi
             else
+              # Linux: upload binary directly (installer stub — no archive needed)
               src=$(find release-artifacts/$platform -name 'Instrumentarium' -type f | head -1)
               if [ -n "$src" ]; then
-                cd "$(dirname "$src")"
-                tar czf ../../release-files/Instrumentarium-${platform}.tar.gz "$(basename "$src")"
-                cd -
+                cp "$src" release-files/Instrumentarium-linux
               fi
             fi
           done
