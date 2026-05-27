@@ -1,259 +1,350 @@
 #!/usr/bin/env python3
 """
-Instrumentarium — Desktop App Launcher
-Opens a native window with the HTML UI and runs the backend server.
+Instrumentarium — Desktop App Launcher (Installer Stub)
+
+This .exe is a lightweight launcher that:
+1. On first run: extracts all files from the PyInstaller bundle to a permanent
+   system folder (%APPDATA%/Instrumentarium on Windows, ~/Library/Application
+   Support/Instrumentarium on macOS, ~/.instrumentarium on Linux).
+2. On subsequent runs: launches the installed copy directly.
+3. On update (new .exe downloaded): re-extracts missing/changed files.
+
+The .exe itself can be placed anywhere (Desktop, USB drive) — it always
+launches from the installed location.
 """
 
-import os, sys, threading, signal, atexit, logging, time
+import os, sys, shutil, logging, subprocess
 
-# ── Detach from console on Windows (must be done before anything else) ──
-if sys.platform == "win32" and not sys.stdout:
-    # PyInstaller console=False sets stdout/stderr to None.
-    # Explicitly redirect to devnull to prevent any module from reopening stdout.
-    sys.stdout = open(os.devnull, "w")
-    sys.stderr = open(os.devnull, "w")
+# ── Determine paths ──────────────────────────────────────────────
+# When running from PyInstaller one-file: _MEIPASS = temp extraction dir
+# When running installed: _MEIPASS does not exist
 
-# ── Working directory ───────────────────────────────────────────────
-# All working files (logs, .bin, downloads, .setup_done, lock) go beside
-# the .exe / script — single folder, no scattering across the system.
-if hasattr(sys, "_MEIPASS"):
-    _BASE_DIR = os.path.dirname(os.path.abspath(sys.executable))
-else:
-    _BASE_DIR = os.path.dirname(os.path.abspath(__file__))
-os.makedirs(_BASE_DIR, exist_ok=True)
+_BUNDLE_DIR = sys._MEIPASS if hasattr(sys, "_MEIPASS") else None
+_EXE_PATH = os.path.abspath(sys.executable)
 
-# ── Logging ──────────────────────────────────────────────────────────
-_LOG_HANDLERS = []
-try:
-    _LOG_HANDLERS.append(logging.FileHandler(os.path.join(_BASE_DIR, "instrumentarium.log"), encoding="utf-8"))
-except Exception:
-    pass
-if not _LOG_HANDLERS:
-    try:
-        _LOG_HANDLERS.append(logging.FileHandler("instrumentarium.log", encoding="utf-8"))
-    except Exception:
-        pass
+def _get_install_dir():
+    """Return the permanent installation directory."""
+    if sys.platform == "win32":
+        base = os.environ.get("APPDATA", os.path.expanduser("~\\AppData\\Roaming"))
+    elif sys.platform == "darwin":
+        base = os.path.expanduser("~/Library/Application Support")
+    else:
+        base = os.path.expanduser("~")
+    return os.path.join(base, "Instrumentarium")
 
-# Logging can be disabled with INSTRUMENTARIUM_LOG=0
-_LOGGING_ENABLED = os.environ.get("INSTRUMENTARIUM_LOG", "1") != "0"
+_INSTALL_DIR = _get_install_dir()
+_INSTALLED_EXE = os.path.join(_INSTALL_DIR, "Instrumentarium.exe" if sys.platform == "win32" else "Instrumentarium")
+_INSTALLED_SERVER = os.path.join(_INSTALL_DIR, "server.py")
+_INSTALLED_HTML = os.path.join(_INSTALL_DIR, "download.html")
+_SETUP_MARKER = os.path.join(_INSTALL_DIR, ".setup_done")
 
-if _LOGGING_ENABLED and _LOG_HANDLERS:
-    logging.basicConfig(
-        level=logging.DEBUG,
-        format="%(asctime)s [%(levelname)s] %(message)s",
-        handlers=_LOG_HANDLERS,
-    )
-elif not _LOGGING_ENABLED:
-    logging.basicConfig(level=logging.CRITICAL + 1)
+# ── Logging (to install dir) ─────────────────────────────────────
+logging.basicConfig(
+    level=logging.DEBUG,
+    format="%(asctime)s [%(levelname)s] %(message)s",
+    handlers=[
+        logging.FileHandler(os.path.join(_INSTALL_DIR, "instrumentarium.log"), encoding="utf-8"),
+    ],
+)
+log = logging.getLogger("instrumentarium.launcher")
 
-log = logging.getLogger("instrumentarium")
-log.info("=== Instrumentarium starting ===")
-log.info("BASE_DIR: %s", _BASE_DIR)
-log.info("sys.executable: %s", sys.executable)
-log.info("sys.platform: %s", sys.platform)
-if hasattr(sys, "_MEIPASS"):
-    log.info("PyInstaller bundle: %s", sys._MEIPASS)
+# ── Check if running from installed location ─────────────────────
+def _is_running_from_install_dir():
+    """Check if this executable IS the installed copy."""
+    if _BUNDLE_DIR:
+        return False  # Running from PyInstaller temp dir
+    return os.path.normcase(os.path.dirname(_EXE_PATH)) == os.path.normcase(_INSTALL_DIR)
 
-# ── Single instance lock ───────────────────────────────────────────
-_LOCK_PATH = os.path.join(_BASE_DIR, ".instrumentarium.lock")
-_SETUP_MARKER_PATH = os.path.join(_BASE_DIR, ".setup_done")
-_lock_fd = None
+# ── Check if installation is complete ────────────────────────────
+def _is_installed():
+    """Check if all required files exist in the install dir."""
+    required = [_INSTALLED_EXE, _INSTALLED_SERVER, _INSTALLED_HTML]
+    if sys.platform == "win32":
+        required.append(os.path.join(_INSTALL_DIR, "Instrumentarium.exe"))
+    return all(os.path.isfile(f) for f in required)
 
-def _acquire_lock():
-    """Try to acquire a lock file. Returns True if lock acquired."""
-    global _lock_fd
-    try:
-        if sys.platform == "win32":
-            import msvcrt
-            _lock_fd = open(_LOCK_PATH, "w")
-            msvcrt.locking(_lock_fd.fileno(), msvcrt.LK_NBLCK, 1)
-        else:
-            import fcntl
-            _lock_fd = open(_LOCK_PATH, "w")
-            fcntl.flock(_lock_fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
-        log.info("Lock acquired: %s", _LOCK_PATH)
-        return True
-    except (ImportError, OSError, IOError) as e:
-        log.warning("Could not acquire lock (another instance running?): %s", e)
+# ── Extract files from bundle to install dir ─────────────────────
+def _extract_bundle():
+    """Extract all files from the PyInstaller bundle (_MEIPASS) to install dir."""
+    log.info("Extracting bundle to: %s", _INSTALL_DIR)
+    os.makedirs(_INSTALL_DIR, exist_ok=True)
+
+    if not _BUNDLE_DIR or not os.path.isdir(_BUNDLE_DIR):
+        log.error("Cannot extract: _MEIPASS not available (%s)", _BUNDLE_DIR)
         return False
 
-if not _acquire_lock():
-    log.info("Another instance is already running — exiting")
-    sys.exit(0)
-
-def _cleanup_lock():
-    global _lock_fd
-    log.info("_cleanup_lock: running")
-    if _lock_fd:
+    # Copy everything from _MEIPASS to _INSTALL_DIR
+    copied = 0
+    for item in os.listdir(_BUNDLE_DIR):
+        src = os.path.join(_BUNDLE_DIR, item)
+        dst = os.path.join(_INSTALL_DIR, item)
         try:
-            _lock_fd.close()
-            log.info("_cleanup_lock: lock fd closed")
+            if os.path.isfile(src):
+                shutil.copy2(src, dst)
+                copied += 1
+            elif os.path.isdir(src):
+                if os.path.isdir(dst):
+                    shutil.rmtree(dst)
+                shutil.copytree(src, dst)
+                copied += 1
         except Exception as e:
-            log.warning("_cleanup_lock: error closing lock fd: %s", e)
-    try:
-        os.remove(_LOCK_PATH)
-        log.info("_cleanup_lock: lock file removed: %s", _LOCK_PATH)
-    except Exception:
-        log.info("_cleanup_lock: lock file already gone or not removable")
+            log.warning("Failed to copy %s: %s", item, e)
 
-atexit.register(_cleanup_lock)
-log.info("atexit handler registered: _cleanup_lock")
+    log.info("Extracted %d items to %s", copied, _INSTALLED_EXE)
 
-# ── Start the backend server in a background thread ─────────────────
-# CRITICAL: We run server code IN-PROCESS, not via subprocess.
-# When PyInstaller builds app.py, sys.executable points to the .exe itself.
-# Using subprocess.Popen([sys.executable, 'server.py']) would launch another
-# copy of the .exe, which launches another, creating a fork bomb.
+    # Make executable on Unix
+    if sys.platform != "win32":
+        for f in [_INSTALLED_EXE, _INSTALLED_SERVER]:
+            if os.path.isfile(f):
+                try:
+                    os.chmod(f, 0o755)
+                except Exception:
+                    pass
 
-SETUP_MARKER_PATH = _SETUP_MARKER_PATH
+    return _is_installed()
 
-def _start_server_in_thread():
-    log.info("=== Server thread starting ===")
-    log.info("_BASE_DIR: %s", _BASE_DIR)
-    log.info("_SETUP_MARKER_PATH: %s", _SETUP_MARKER_PATH)
-    os.chdir(_BASE_DIR)
-    log.info("CWD after chdir: %s", os.getcwd())
-    try:
-        import server as srv
-        log.info("server.SCRIPT_DIR: %s", srv.SCRIPT_DIR)
-        log.info("server.SETUP_MARKER: %s", srv.SETUP_MARKER)
-        log.info("server._BASE_DIR: %s", srv._BASE_DIR)
+# ── Update installed files (on new .exe download) ────────────────
+def _update_if_needed():
+    """Update installed files if the bundle has newer versions."""
+    if not _BUNDLE_DIR:
+        return  # Running installed, no bundle to compare
 
-        marker_exists = os.path.exists(_SETUP_MARKER_PATH)
-        log.info(".setup_done exists: %s", marker_exists)
+    updated = False
+    for item in os.listdir(_BUNDLE_DIR):
+        src = os.path.join(_BUNDLE_DIR, item)
+        dst = os.path.join(_INSTALL_DIR, item)
 
-        if marker_exists:
-            srv.setup_state["phase"] = "silent_check"
-            srv.setup_state["setup_done"] = True
-            log.info("Starting silent dep check thread...")
-            t = threading.Thread(target=srv._ensure_deps, daemon=True)
-            t.start()
+        if os.path.isfile(src):
+            # Copy if file doesn't exist or is different size
+            if not os.path.isfile(dst) or os.path.getsize(src) != os.path.getsize(dst):
+                try:
+                    shutil.copy2(src, dst)
+                    updated = True
+                    log.info("Updated: %s", item)
+                except Exception as e:
+                    log.warning("Failed to update %s: %s", item, e)
+
+    if updated and sys.platform != "win32":
+        for f in [_INSTALLED_EXE]:
+            if os.path.isfile(f):
+                try:
+                    os.chmod(f, 0o755)
+                except Exception:
+                    pass
+
+    return updated
+
+# ── Main launcher logic ──────────────────────────────────────────
+def main():
+    log.info("=== Instrumentarium Launcher ===")
+    log.info("EXE: %s", _EXE_PATH)
+    log.info("BUNDLE: %s", _BUNDLE_DIR)
+    log.info("INSTALL_DIR: %s", _INSTALL_DIR)
+    log.info("Running from install dir: %s", _is_running_from_install_dir())
+
+    # Case 1: Running from installed location → just exec into the real app
+    if _is_running_from_install_dir():
+        log.info("Already running from install dir, launching server...")
+        _launch_installed()
+        return
+
+    # Case 2: Running from bundle (first run or update)
+    if _is_running_from_install_dir() is False and _BUNDLE_DIR:
+        if _is_installed():
+            log.info("Installation found, updating files...")
+            _update_if_needed()
         else:
-            log.info("Starting full setup wizard thread...")
-            t = threading.Thread(target=srv.run_setup, daemon=True)
-            t.start()
+            log.info("First run — extracting bundle...")
+            if not _extract_bundle():
+                log.error("Failed to extract bundle!")
+                sys.exit(1)
 
-        log.info("Creating HTTP server on 0.0.0.0:%d...", 18765)
-        srv.srv = srv.http.server.HTTPServer(("0.0.0.0", srv.PORT), srv.Handler)
-        srv.srv.allow_reuse_address = True
-        srv.srv.timeout = 0.5
-        log.info("HTTP server created, calling serve_forever()...")
-        srv.srv.serve_forever()
-        log.info("serve_forever() returned — server thread exiting")
-    except Exception as e:
-        log.error("Server thread error: %s", e, exc_info=True)
+        # Launch the installed copy
+        if os.path.isfile(_INSTALLED_EXE):
+            log.info("Launching installed copy: %s", _INSTALLED_EXE)
+            # Replace current process with installed copy
+            os.execv(_INSTALLED_EXE, [_INSTALLED_EXE] + sys.argv[1:])
+        else:
+            # Fallback: run from bundle
+            log.warning("Installed exe not found, running from bundle")
+            _launch_from_bundle()
+        return
 
-log.info("Launching server thread...")
-server_thread = threading.Thread(target=_start_server_in_thread, daemon=True)
-server_thread.start()
-log.info("Server thread launched, id=%d", server_thread.ident)
+    # Case 3: No bundle, not installed (dev mode)
+    log.info("Development mode — running from source")
+    _launch_from_bundle()
 
-# Wait until server is actually listening (max 5s)
-import socket
-for _ in range(50):
+
+def _launch_installed():
+    """Launch the app from the installed directory."""
+    os.chdir(_INSTALL_DIR)
+    # Import server module from installed location
+    sys.path.insert(0, _INSTALL_DIR)
+    _run_app()
+
+
+def _launch_from_bundle():
+    """Launch the app from the current bundle/temp directory."""
+    if _BUNDLE_DIR:
+        os.chdir(_BUNDLE_DIR)
+        sys.path.insert(0, _BUNDLE_DIR)
+    else:
+        os.chdir(os.path.dirname(_EXE_PATH))
+        sys.path.insert(0, os.path.dirname(_EXE_PATH))
+    _run_app()
+
+
+def _run_app():
+    """Run the actual application (server + pywebview)."""
+    # ── Detach from console on Windows ──────────────────────────
+    if sys.platform == "win32" and not sys.stdout:
+        sys.stdout = open(os.devnull, "w")
+        sys.stderr = open(os.devnull, "w")
+
+    import threading, time, signal
+
+    _BASE_DIR = os.getcwd()
+
+    # Single instance lock
+    _LOCK_PATH = os.path.join(_BASE_DIR, ".instrumentarium.lock")
+    _lock_fd = None
+
+    def _acquire_lock():
+        global _lock_fd
+        try:
+            if sys.platform == "win32":
+                import msvcrt
+                _lock_fd = open(_LOCK_PATH, "w")
+                msvcrt.locking(_lock_fd.fileno(), msvcrt.LK_NBLCK, 1)
+            else:
+                import fcntl
+                _lock_fd = open(_LOCK_PATH, "w")
+                fcntl.flock(_lock_fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
+            return True
+        except (ImportError, OSError, IOError):
+            return False
+
+    if not _acquire_lock():
+        log.info("Another instance is already running — exiting")
+        sys.exit(0)
+
+    def _cleanup_lock():
+        global _lock_fd
+        if _lock_fd:
+            try:
+                _lock_fd.close()
+            except Exception:
+                pass
+        try:
+            os.remove(_LOCK_PATH)
+        except Exception:
+            pass
+
+    def _start_server_in_thread():
+        log.info("=== Server thread starting ===")
+        try:
+            import server as srv
+            srv.SCRIPT_DIR = _BASE_DIR
+            srv._BASE_DIR = _BASE_DIR
+            srv.SETUP_MARKER = os.path.join(_BASE_DIR, ".setup_done")
+
+            marker_exists = os.path.exists(srv.SETUP_MARKER)
+            if marker_exists:
+                srv.setup_state["phase"] = "silent_check"
+                srv.setup_state["setup_done"] = True
+                t = threading.Thread(target=srv._ensure_deps, daemon=True)
+                t.start()
+            else:
+                t = threading.Thread(target=srv.run_setup, daemon=True)
+                t.start()
+
+            srv.srv = srv.http.server.HTTPServer(("0.0.0.0", srv.PORT), srv.Handler)
+            srv.srv.allow_reuse_address = True
+            srv.srv.timeout = 0.5
+            srv.srv.serve_forever()
+        except Exception as e:
+            log.error("Server thread error: %s", e, exc_info=True)
+
+    server_thread = threading.Thread(target=_start_server_in_thread, daemon=True)
+    server_thread.start()
+
+    # Wait for server
+    import socket
+    for _ in range(50):
+        try:
+            sock = socket.create_connection(("127.0.0.1", 18765), timeout=0.1)
+            sock.close()
+            break
+        except (ConnectionRefusedError, OSError):
+            time.sleep(0.1)
+
+    # ── Open window ─────────────────────────────────────────────
+    log.info("Opening window...")
+
+    def _do_cleanup():
+        try:
+            import server as srv
+            if hasattr(srv, 'srv') and srv.srv:
+                srv.srv.shutdown()
+        except Exception:
+            pass
+        try:
+            import server as srv
+            if srv._active_proc[0] and srv._active_proc[0].poll() is None:
+                srv._active_proc[0].kill()
+        except Exception:
+            pass
+        _cleanup_lock()
+
     try:
-        sock = socket.create_connection(("127.0.0.1", 18765), timeout=0.1)
-        sock.close()
-        log.info("Server is ready on port 18765")
-        break
-    except (ConnectionRefusedError, OSError):
-        time.sleep(0.1)
-else:
-    log.warning("Server didn't start in time, proceeding anyway")
+        import webview
 
-# ── Open UI in a native app window (pywebview) ─────────────────────
-log.info("Opening window...")
+        window = webview.create_window(
+            "Instrumentarium",
+            url="http://localhost:18765",
+            width=620,
+            height=720,
+            resizable=False,
+        )
 
-def _do_cleanup() -> None:
-    """Kill yt-dlp subprocess, stop server, remove lock file."""
-    log.info("_do_cleanup: running")
-    try:
-        # Stop the HTTP server directly instead of via HTTP call
-        import server as srv
-        if hasattr(srv, 'srv') and srv.srv:
-            srv.srv.shutdown()
-            log.info("_do_cleanup: server.shutdown() called")
+        if window:
+            def _on_closing():
+                t = threading.Thread(target=_do_cleanup, daemon=True)
+                t.start()
+                os._exit(0)
+
+            window.events.closing += _on_closing
+            window.events.closed += lambda: os._exit(0)
+
+        def _sigterm_handler(signum, frame):
+            _do_cleanup()
+            os._exit(0)
+        signal.signal(signal.SIGTERM, _sigterm_handler)
+
+        _renderers = ["edgechromium"] if sys.platform == "win32" else []
+        _started = False
+        for _gui in _renderers:
+            try:
+                webview.start(gui=_gui)
+                _started = True
+                break
+            except Exception:
+                pass
+
+        if not _started:
+            webview.start()
+
     except Exception as e:
-        log.warning("_do_cleanup: could not stop server: %s", e)
-    # Kill active yt-dlp subprocess
-    try:
-        import server as srv
-        if srv._active_proc[0] and srv._active_proc[0].poll() is None:
-            srv._active_proc[0].kill()
-            log.info("_do_cleanup: yt-dlp killed")
-    except Exception as e:
-        log.warning("_do_cleanup: could not kill yt-dlp: %s", e)
+        log.error("Could not open native window: %s", e, exc_info=True)
+        import webbrowser, threading as _t
+        webbrowser.open("http://localhost:18765")
+        try:
+            _t.Event().wait()
+        except KeyboardInterrupt:
+            pass
+
     _cleanup_lock()
 
 
-def _do_cleanup_async() -> None:
-    """Run _do_cleanup in a daemon thread so the window can close immediately."""
-    t = threading.Thread(target=_do_cleanup, daemon=True)
-    t.start()
-
-try:
-    import webview
-
-    window = webview.create_window(
-        "Instrumentarium",
-        url="http://localhost:18765",
-        width=620,
-        height=720,
-        resizable=False,
-    )
-
-    if window:
-        def _on_closing():
-            log.info("=== Window close event received ===")
-            _do_cleanup_async()
-            log.info("=== Final exit ===")
-            os._exit(0)
-
-        window.events.closing += _on_closing
-        window.events.closed += lambda: os._exit(0)
-
-    import signal as _signal
-    def _sigterm_handler(signum, frame):
-        log.info("=== SIGTERM received ===")
-        _do_cleanup_async()
-        log.info("=== Final exit ===")
-        os._exit(0)
-    _signal.signal(_signal.SIGTERM, _sigterm_handler)
-
-    # Try renderers in order of preference:
-    #   1. edgechromium (WebView2, modern Chromium — needs WebView2 Runtime)
-    #   2. default auto-detect (GTK/Qt/Cocoa depending on platform)
-    _renderers = ["edgechromium"] if sys.platform == "win32" else []
-    _started = False
-    for _gui in _renderers:
-        try:
-            log.info("Trying webview gui=%s ...", _gui)
-            webview.start(gui=_gui)
-            log.info("webview.start(gui=%s) returned — window closed", _gui)
-            _started = True
-            break
-        except Exception as _e:
-            log.warning("webview gui=%s failed: %s", _gui, _e)
-
-    if not _started:
-        log.info("Falling back to webview auto-detect")
-        webview.start()
-        log.info("webview.start() returned — window closed")
-
-    log.info("=== pywebview event loop exited ===")
-
-except Exception as e:
-    log.error("Could not open native window: %s", e, exc_info=True)
-    import webbrowser, threading
-    webbrowser.open("http://localhost:18765")
-    log.info("Opened in system browser — blocking main thread")
-    try:
-        threading.Event().wait()
-    except KeyboardInterrupt:
-        pass
-    log.info("Main thread unblocked — exiting")
-
-# Cleanup lock file — must be done here, not in atexit, because
-# pywebview/GTK may call exit() internally and skip atexit handlers.
-_cleanup_lock()
-log.info("=== Instrumentarium shutdown complete ===")
+if __name__ == "__main__":
+    main()

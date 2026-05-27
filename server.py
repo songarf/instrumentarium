@@ -57,12 +57,13 @@ def _safe_print(*args, **kwargs):
 PORT = 18765
 
 # ── Working directory ───────────────────────────────────────────────
-# All working files (logs, .bin, downloads, .setup_done, lock) go beside
-# the .exe / script — single folder, no scattering across the system.
-if hasattr(sys, "_MEIPASS"):
-    _BASE_DIR = os.path.dirname(os.path.abspath(sys.executable))
-else:
-    _BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+# All working files (logs, .bin, downloads, .setup_done, lock) go in the
+# installation directory. Can be overridden by the launcher (app.py).
+if "_BASE_DIR" not in dir() or "_BASE_DIR" is None:
+    if hasattr(sys, "_MEIPASS"):
+        _BASE_DIR = os.path.dirname(os.path.abspath(sys.executable))
+    else:
+        _BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 os.makedirs(_BASE_DIR, exist_ok=True)
 
 SETUP_MARKER = os.path.join(_BASE_DIR, ".setup_done")
