@@ -32,18 +32,18 @@
 
   /* ═══════════════════════════════════════════════════════════ */
   /* SETUP SCREEN                                              */
-  /* ═══════════════════════════════════════════════════════════ */
+  /* ── Setup screen ──────────────────────────────────────── */
   .setup-screen { text-align: center; display: none; }
   .setup-screen.active { display: block; }
 
   .setup-badge {
     display: inline-block;
-    background: linear-gradient(135deg, rgba(108,92,231,.15), rgba(167,139,250,.15));
-    border: 1px solid rgba(108,92,231,.3);
+    background: linear-gradient(135deg, rgba(108,92,231,.2), rgba(167,139,250,.2));
+    border: 1px solid rgba(108,92,231,.4);
     border-radius: 20px;
-    padding: 4px 14px;
-    font-size: .7rem;
-    color: #a78bfa;
+    padding: 5px 16px;
+    font-size: .72rem;
+    color: #c4b5fd;
     font-weight: 600;
     letter-spacing: .04em;
     margin-bottom: 20px;
@@ -65,15 +65,15 @@
   }
 
   .setup-title { font-size: 1.15rem; color: #fff; margin-bottom: 8px; font-weight: 700; }
-  .setup-desc { font-size: .78rem; color: #777; margin-bottom: 20px; line-height: 1.6; }
+  .setup-desc { font-size: .82rem; color: #999; margin-bottom: 20px; line-height: 1.6; }
 
   .setup-checklist {
     display: flex; gap: 10px; margin-bottom: 22px;
   }
   .checklist-item {
     flex: 1;
-    background: rgba(255,255,255,.03);
-    border: 1px solid rgba(255,255,255,.06);
+    background: rgba(255,255,255,.04);
+    border: 1px solid rgba(255,255,255,.08);
     border-radius: 12px;
     padding: 12px 8px;
     text-align: center;
@@ -82,10 +82,10 @@
     font-size: 1.3rem; margin-bottom: 6px; display: block;
   }
   .checklist-item .check-label {
-    font-size: .72rem; color: #aaa; display: block; font-weight: 600;
+    font-size: .75rem; color: #ccc; display: block; font-weight: 600;
   }
   .checklist-item .check-sub {
-    font-size: .65rem; color: #555; display: block; margin-top: 2px;
+    font-size: .68rem; color: #777; display: block; margin-top: 2px;
   }
 
   .setup-btn {
@@ -131,50 +131,48 @@
     font-size: 1.1rem; color: #fff; font-weight: 700;
     display: flex; align-items: center; gap: 8px;
   }
-  .dl-header-left h1 .header-icon {
-    font-size: 1.2rem;
-  }
+  .dl-header-left h1 .header-icon { font-size: 1.2rem; }
   .dl-header-left .subtitle {
-    font-size: .72rem; color: #555; margin-top: 4px; line-height: 1.5;
+    font-size: .75rem; color: #888; margin-top: 4px; line-height: 1.5;
   }
   .dl-header-right {
     display: flex; gap: 8px; padding-top: 2px;
   }
   .header-ico-btn {
     width: 32px; height: 32px; border-radius: 8px;
-    border: 1px solid #2a2a4a; background: rgba(255,255,255,.03);
-    color: #666; cursor: pointer; font-size: .85rem;
+    border: 1px solid #2a2a4a; background: rgba(255,255,255,.05);
+    color: #999; cursor: pointer; font-size: .85rem;
     display: flex; align-items: center; justify-content: center;
     transition: all .2s;
   }
-  .header-ico-btn:hover { border-color: #4a4a6a; color: #aaa; background: rgba(255,255,255,.06); }
+  .header-ico-btn:hover { border-color: #4a4a6a; color: #ccc; background: rgba(255,255,255,.08); }
 
   /* ── Input ────────────────────────────────────────────────── */
   .input-group { margin-bottom: 14px; }
   .input-group label {
     display: block; font-size: .68rem; text-transform: uppercase;
-    letter-spacing: .1em; color: #555; margin-bottom: 6px; font-weight: 600;
+    letter-spacing: .1em; color: #888; margin-bottom: 6px; font-weight: 600;
   }
 
   .url-input-wrap {
     display: flex; align-items: center; position: relative;
   }
   .url-input-wrap .input-chain {
-    position: absolute; left: 12px; color: #444; font-size: .9rem; pointer-events: none;
+    position: absolute; left: 12px; color: #555; font-size: .9rem; pointer-events: none;
   }
   .url-input-wrap input {
     flex: 1;
     background: #0a0a1a;
-    border: 1px solid #1e1e3f;
+    border: 1px solid #2a2a4a;
     border-radius: 12px;
     padding: 11px 40px 11px 38px;
     color: #e0e0e0; font-size: .85rem;
     outline: none; transition: border .2s;
   }
   .url-input-wrap input:focus { border-color: #6c5ce7; }
-  .url-input-wrap input::placeholder { color: #444; }
+  .url-input-wrap input::placeholder { color: #555; }
   .url-input-wrap .input-clipboard {
-    position: absolute; right: 10px; color: #444; cursor: pointer; font-size: .85rem;
+    position: absolute; right: 10px; color: #555; cursor: pointer; font-size: .85rem;
     transition: color .2s; background: none; border: none; padding: 4px;
   }
   .url-input-wrap .input-clipboard:hover { color: #a78bfa; }
@@ -182,16 +180,16 @@
   /* ── Mode toggle ──────────────────────────────────────────── */
   .options { display: flex; gap: 8px; margin-bottom: 12px; }
   .opt-btn {
-    flex: 1; background: rgba(255,255,255,.03); border: 1px solid rgba(255,255,255,.06);
+    flex: 1; background: rgba(255,255,255,.04); border: 1px solid rgba(255,255,255,.08);
     border-radius: 12px; padding: 10px 8px; text-align: center;
-    cursor: pointer; transition: all .2s; font-size: .78rem; color: #666;
+    cursor: pointer; transition: all .2s; font-size: .8rem; color: #888;
     user-select: none; font-weight: 600;
   }
-  .opt-btn:hover { border-color: #4a4a6a; color: #aaa; }
+  .opt-btn:hover { border-color: #4a4a6a; color: #ccc; }
   .opt-btn.active {
     border-color: rgba(108,92,231,.5);
-    background: linear-gradient(135deg, rgba(108,92,231,.12), rgba(167,139,250,.08));
-    color: #a78bfa;
+    background: linear-gradient(135deg, rgba(108,92,231,.15), rgba(167,139,250,.1));
+    color: #c4b5fd;
     box-shadow: 0 0 20px rgba(108,92,231,.1);
   }
   .opt-btn .icon { font-size: 1.2rem; display: block; margin-bottom: 3px; }
@@ -258,23 +256,23 @@
   /* ── Error notification ───────────────────────────────────── */
   .error-toast {
     display: none; margin-top: 12px; padding: 12px 14px;
-    background: rgba(255,71,87,.06); border: 1px solid rgba(255,71,87,.2); border-radius: 10px;
-    font-size: .78rem; color: #ff6b6b; line-height: 1.5;
+    background: rgba(255,71,87,.08); border: 1px solid rgba(255,71,87,.25); border-radius: 10px;
+    font-size: .8rem; color: #ff6b6b; line-height: 1.5;
   }
   .error-toast.visible { display: block; animation: fadeIn .3s ease; }
   .error-toast .title { font-weight: 700; margin-bottom: 4px; }
-  .error-toast .hint { font-size: .68rem; color: #555; margin-top: 6px; }
-  .error-toast .hint a { color: #555; text-decoration: underline; }
+  .error-toast .hint { font-size: .7rem; color: #777; margin-top: 6px; }
+  .error-toast .hint a { color: #888; text-decoration: underline; }
   .error-toast .hint a:hover { color: #a78bfa; }
 
   /* ── Footer ───────────────────────────────────────────────── */
   .footer {
-    margin-top: 14px; font-size: .68rem; color: #333; text-align: center;
+    margin-top: 14px; font-size: .7rem; color: #555; text-align: center;
     display: flex; align-items: center; justify-content: center; gap: 4px;
   }
   .footer .cookie-link {
-    cursor: pointer; color: #444; transition: color .2s;
-    background: none; border: none; font-size: .68rem; padding: 0;
+    cursor: pointer; color: #777; transition: color .2s;
+    background: none; border: none; font-size: .7rem; padding: 0;
   }
   .footer .cookie-link:hover { color: #a78bfa; }
 
@@ -414,8 +412,8 @@
 
     <p class="footer">
       <button class="cookie-link" onclick="showCookiesDialog()">🍪 Cookies</button>
-      <span class="cookie-tooltip-anchor" style="display:inline-flex;align-items:center;justify-content:center;width:16px;height:16px;border-radius:50%;border:1px solid #333;font-size:.6rem;color:#444;cursor:help;vertical-align:middle;position:relative;">?
-        <span class="cookie-tooltip" style="display:none;position:absolute;bottom:140%;left:50%;transform:translateX(-50%);background:#12122a;border:1px solid #1e1e3f;border-radius:8px;padding:8px 12px;font-size:.65rem;color:#888;width:220px;text-align:center;line-height:1.4;box-shadow:0 4px 20px rgba(0,0,0,.5);z-index:100;pointer-events:none;">Используйте cookies, чтобы скачать видео из приватных страниц, доступных только после входа в аккаунт</span>
+      <span class="cookie-tooltip-anchor" style="display:inline-flex;align-items:center;justify-content:center;width:16px;height:16px;border-radius:50%;border:1px solid #444;font-size:.6rem;color:#666;cursor:help;vertical-align:middle;position:relative;">?
+        <span class="cookie-tooltip" style="display:none;position:absolute;bottom:140%;left:50%;transform:translateX(-50%);background:#1a1a2e;border:1px solid #2a2a4a;border-radius:8px;padding:8px 12px;font-size:.68rem;color:#aaa;width:220px;text-align:center;line-height:1.4;box-shadow:0 4px 20px rgba(0,0,0,.5);z-index:100;pointer-events:none;">Используйте cookies, чтобы скачать видео из приватных страниц, доступных только после входа в аккаунт</span>
       </span>
     </p>
   </div>
@@ -424,32 +422,32 @@
   <!-- COOKIES DIALOG                                        -->
   <!-- ═══════════════════════════════════════════════════════ -->
   <div id="cookiesDialog" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.7);z-index:999;align-items:center;justify-content:center;">
-    <div style="background:#12122a;border:1px solid #1e1e3f;border-radius:20px;padding:24px;width:520px;max-width:95vw;box-shadow:0 24px 80px rgba(0,0,0,.6);">
+    <div style="background:#12122a;border:1px solid #2a2a4a;border-radius:20px;padding:24px;width:520px;max-width:95vw;box-shadow:0 24px 80px rgba(0,0,0,.6);">
       <h2 style="font-size:1rem;margin-bottom:6px;color:#fff;font-weight:700;">🍪 Cookies</h2>
-      <p style="font-size:.75rem;color:#555;margin-bottom:10px;line-height:1.5;">
+      <p style="font-size:.78rem;color:#888;margin-bottom:10px;line-height:1.5;">
         Перетащите файл cookies.txt или нажмите на область ниже. Также можно вставить текст вручную.
       </p>
       <div id="cookieDropzone"
            onclick="document.getElementById('cookieFileInput').click()"
-           style="border:2px dashed #1e1e3f;border-radius:14px;padding:24px;text-align:center;cursor:pointer;margin-bottom:14px;transition:border-color .2s,background .2s;">
+           style="border:2px dashed #2a2a4a;border-radius:14px;padding:24px;text-align:center;cursor:pointer;margin-bottom:14px;transition:border-color .2s,background .2s;">
         <div style="font-size:2rem;margin-bottom:6px;">📄</div>
-        <div style="font-size:.78rem;color:#555;">Перетащите файл <strong>cookies.txt</strong> сюда<br>или нажмите для выбора</div>
+        <div style="font-size:.8rem;color:#777;">Перетащите файл <strong>cookies.txt</strong> сюда<br>или нажмите для выбора</div>
         <input type="file" id="cookieFileInput" accept=".txt,text/plain" style="display:none">
       </div>
 
       <textarea id="cookiesContent" rows="3" placeholder="…или вставьте содержимое cookies.txt сюда"
-        style="width:100%;background:#0a0a1a;border:1px solid #1e1e3f;border-radius:12px;padding:10px 14px;color:#e0e0e0;font-size:.75rem;outline:none;margin-bottom:12px;resize:vertical;font-family:monospace;box-sizing:border-box;"></textarea>
+        style="width:100%;background:#0a0a1a;border:1px solid #2a2a4a;border-radius:12px;padding:10px 14px;color:#e0e0e0;font-size:.78rem;outline:none;margin-bottom:12px;resize:vertical;font-family:monospace;box-sizing:border-box;"></textarea>
       <div style="position:relative;display:inline-block;margin-bottom:14px;">
-        <span style="font-size:.7rem;color:#444;">Как получить cookies.txt</span>
-        <span class="cookie-help-anchor" style="display:inline-flex;align-items:center;justify-content:center;width:14px;height:14px;border-radius:50%;border:1px solid #333;font-size:.55rem;color:#555;cursor:help;vertical-align:middle;margin-left:4px;">?</span>
-        <span class="cookie-help-tooltip" style="display:none;position:absolute;bottom:140%;left:0;background:#12122a;border:1px solid #1e1e3f;border-radius:8px;padding:10px 14px;font-size:.68rem;color:#888;width:260px;line-height:1.5;box-shadow:0 4px 20px rgba(0,0,0,.5);z-index:100;pointer-events:none;">Установите браузерное расширение <strong>Get cookies.txt LOCALLY</strong> → откройте нужную страницу и войдите в аккаунт → нажмите на расширение → <strong>Export</strong> → перетащите файл сюда</span>
+        <span style="font-size:.72rem;color:#666;">Как получить cookies.txt</span>
+        <span class="cookie-help-anchor" style="display:inline-flex;align-items:center;justify-content:center;width:14px;height:14px;border-radius:50%;border:1px solid #444;font-size:.55rem;color:#666;cursor:help;vertical-align:middle;margin-left:4px;">?</span>
+        <span class="cookie-help-tooltip" style="display:none;position:absolute;bottom:140%;left:0;background:#1a1a2e;border:1px solid #2a2a4a;border-radius:8px;padding:10px 14px;font-size:.7rem;color:#aaa;width:260px;line-height:1.5;box-shadow:0 4px 20px rgba(0,0,0,.5);z-index:100;pointer-events:none;">Установите браузерное расширение <strong>Get cookies.txt LOCALLY</strong> → откройте нужную страницу и войдите в аккаунт → нажмите на расширение → <strong>Export</strong> → перетащите файл сюда</span>
       </div>
       <div style="display:flex;gap:8px;justify-content:flex-end;">
-        <button class="btn" onclick="closeCookiesDialog()" style="padding:10px 20px;background:none;border:1px solid #1e1e3f;border-radius:10px;color:#555;cursor:pointer;font-size:.82rem;">Отмена</button>
-        <button class="btn" onclick="clearCookies()" style="padding:10px 20px;background:none;border:1px solid rgba(255,71,87,.3);border-radius:10px;color:#ff6b6b;cursor:pointer;font-size:.82rem;">Очистить</button>
-        <button class="btn btn-primary" onclick="saveCookies()" style="padding:10px 20px;background:linear-gradient(135deg,#6c5ce7,#a78bfa);border:none;border-radius:10px;color:#fff;cursor:pointer;font-size:.82rem;font-weight:600;box-shadow:0 4px 16px rgba(108,92,231,.25);">Сохранить</button>
+        <button class="btn" onclick="closeCookiesDialog()" style="padding:10px 20px;background:none;border:1px solid #2a2a4a;border-radius:10px;color:#888;cursor:pointer;font-size:.85rem;">Отмена</button>
+        <button class="btn" onclick="clearCookies()" style="padding:10px 20px;background:none;border:1px solid rgba(255,71,87,.3);border-radius:10px;color:#ff6b6b;cursor:pointer;font-size:.85rem;">Очистить</button>
+        <button class="btn btn-primary" onclick="saveCookies()" style="padding:10px 20px;background:linear-gradient(135deg,#6c5ce7,#a78bfa);border:none;border-radius:10px;color:#fff;cursor:pointer;font-size:.85rem;font-weight:600;box-shadow:0 4px 16px rgba(108,92,231,.25);">Сохранить</button>
       </div>
-      <p id="cookiesStatus" style="font-size:.68rem;color:#444;margin-top:10px;"></p>
+      <p id="cookiesStatus" style="font-size:.7rem;color:#555;margin-top:10px;"></p>
     </div>
   </div>
 
