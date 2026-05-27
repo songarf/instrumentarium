@@ -43,8 +43,9 @@ jobs:
             artifact-name: windows-instrumentarium
 
           - os: macos-latest
-            spec: video-downloader.spec
+            spec: video-downloader-macos.spec
             artifact-name: macos-instrumentarium
+            is-macos: true
 
     runs-on: ${{ matrix.os }}
     steps:
@@ -62,17 +63,37 @@ jobs:
             pip install cefpython3
           fi
 
-      - name: Build binary
+      - name: Generate macOS icon
+        if: matrix.is-macos
+        shell: bash
         run: |
-          # Force clean PyInstaller cache (Windows/Linux)
+          cd assets
+          bash gen_icns.sh
+          cd ..
+
+      - name: Build binary
+        shell: bash
+        run: |
+          # Force clean PyInstaller cache
           python -c "import shutil, os, sys; cache = os.path.join(os.environ.get('LOCALAPPDATA' if sys.platform=='win32' else 'HOME', ''), 'pyinstaller', 'bincache'); shutil.rmtree(cache, errors='ignore') if os.path.isdir(cache) else None"
           pyinstaller ${{ matrix.spec }} --clean --distpath dist --workpath build
+
+      - name: Sign and notarize (macOS)
+        if: matrix.is-macos
+        shell: bash
+        run: |
+          # Ad-hoc codesign (no Apple Developer Account needed for basic sign)
+          if [ -d "dist/Instrumentarium.app" ]; then
+            codesign --force --deep --sign - --entitlements assets/entitlements.plist dist/Instrumentarium.app 2>/dev/null || echo "⚠️  codesign skipped (no signing identity)"
+          fi
 
       - name: Upload binary as artifact
         uses: actions/upload-artifact@v4
         with:
           name: ${{ matrix.artifact-name }}
-          path: dist/Instrumentarium*
+          path: |
+            dist/Instrumentarium.app
+            dist/Instrumentarium*
           retention-days: 30
 
   release:
@@ -88,20 +109,36 @@ jobs:
           path: release-artifacts
 
       - name: Create archives
+        shell: bash
         run: |
           mkdir -p release-files
-          # Each artifact dir contains one file: Instrumentarium or Instrumentarium.exe
           for platform in linux windows macos; do
-            src=$(find release-artifacts/$platform -name 'Instrumentarium*' -type f | head -1)
-            if [ -n "$src" ]; then
-              ext="${src##*.}"
-              if [ "$platform" = "windows" ]; then
-                # Wrap single exe in zip
+            if [ "$platform" = "windows" ]; then
+              src=$(find release-artifacts/$platform -name '*.exe' -type f | head -1)
+              if [ -n "$src" ]; then
                 cd "$(dirname "$src")"
                 zip ../../release-files/Instrumentarium-windows.zip "$(basename "$src")"
                 cd -
+              fi
+            elif [ "$platform" = "macos" ]; then
+              # Prefer .app bundle
+              app=$(find release-artifacts/$platform -name 'Instrumentarium.app' -type d | head -1)
+              if [ -n "$app" ]; then
+                cd "$(dirname "$app")"
+                tar czf ../../release-files/Instrumentarium-macos.tar.gz "$(basename "$app")"
+                cd -
               else
-                # Wrap single binary in tar.gz
+                # Fallback to bare binary
+                src=$(find release-artifacts/$platform -name 'Instrumentarium' -type f | head -1)
+                if [ -n "$src" ]; then
+                  cd "$(dirname "$src")"
+                  tar czf ../../release-files/Instrumentarium-macos.tar.gz "$(basename "$src")"
+                  cd -
+                fi
+              fi
+            else
+              src=$(find release-artifacts/$platform -name 'Instrumentarium' -type f | head -1)
+              if [ -n "$src" ]; then
                 cd "$(dirname "$src")"
                 tar czf ../../release-files/Instrumentarium-${platform}.tar.gz "$(basename "$src")"
                 cd -

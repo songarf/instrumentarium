@@ -331,6 +331,18 @@ def _has_ffmpeg():
     """Return True if ffmpeg is available."""
     return _find_ffmpeg() is not None
 
+def _extract_from_zip(zip_path, dest_dir, names):
+    """Extract specific files from a zip archive into dest_dir."""
+    with zipfile.ZipFile(zip_path, "r") as zf:
+        for member in zf.namelist():
+            basename = os.path.basename(member)
+            if basename in names:
+                target = os.path.join(dest_dir, basename)
+                with zf.open(member) as src, open(target, "wb") as dst:
+                    shutil.copyfileobj(src, dst)
+                log.info("Extracted %s -> %s", basename, target)
+
+
 def install_ffmpeg():
     """Download ffmpeg essentials into .bin/. Returns True on success."""
     system = platform.system()
@@ -398,12 +410,54 @@ def install_ffmpeg():
             return False
 
     elif system == "Darwin":
-        msg("🍎 Установи ffmpeg:", "info")
-        msg("   brew install ffmpeg", "info")
+        # Try to find existing ffmpeg first
         ffmpeg_path = _find_ffmpeg()
         if ffmpeg_path:
             msg("✅ ffmpeg найден: " + ffmpeg_path, "ok")
             return True
+
+        # Download static ffmpeg build for macOS
+        msg("⬇️  Скачиваю ffmpeg…", "info")
+        log.info("Downloading ffmpeg for macOS")
+
+        # evermeet.cx static builds — universal (Intel + Apple Silicon)
+        ffmpeg_url = "https://evermeet.cx/ffmpeg/getrelease/zip"
+        ffprobe_url = "https://evermeet.cx/ffmpeg/getrelease/ffprobe/zip"
+
+        try:
+            import ssl as _ssl
+            _ctx = _ssl.create_default_context()
+            _ctx.check_hostname = False
+            _ctx.verify_mode = _ssl.CERT_NONE
+
+            zip_path = os.path.join(YT_DLP_DIR, "ffmpeg-macos.zip")
+            urllib.request.urlretrieve(ffmpeg_url, zip_path)
+            _extract_from_zip(zip_path, YT_DLP_DIR, ["ffmpeg"])
+            os.remove(zip_path)
+
+            zip_path = os.path.join(YT_DLP_DIR, "ffprobe-macos.zip")
+            urllib.request.urlretrieve(ffprobe_url, zip_path)
+            _extract_from_zip(zip_path, YT_DLP_DIR, ["ffprobe"])
+            os.remove(zip_path)
+
+            # Make executable
+            for name in ("ffmpeg", "ffprobe"):
+                p = os.path.join(YT_DLP_DIR, name)
+                if os.path.isfile(p):
+                    os.chmod(p, 0o755)
+
+            ffmpeg_path = _find_ffmpeg()
+            if ffmpeg_path:
+                msg("✅ ffmpeg установлен!", "ok")
+                log.info("ffmpeg installed at %s", ffmpeg_path)
+                return True
+        except Exception as e:
+            log.warning("ffmpeg auto-download failed: %s", e)
+            msg("⚠️ Не удалось скачать ffmpeg автоматически.", "info")
+
+        # Fallback: instruct user
+        msg("🍎 Установи ffmpeg:", "info")
+        msg("   brew install ffmpeg", "info")
         return False
 
     else:
