@@ -213,11 +213,11 @@ def install_ytdlp():
     if is_win:
         urls = [
             "https://github.com/yt-dlp/yt-dlp/releases/latest/download/yt-dlp.exe",
-            "https://github.com/yt-dlp/yt-dlp/releases/latest/download/yt-dlp.exe",
         ]
     else:
         urls = [
             "https://github.com/yt-dlp/yt-dlp/releases/latest/download/yt-dlp",
+            "https://github.yongqinget.cn/https://github.com/yt-dlp/yt-dlp/releases/latest/download/yt-dlp",
         ]
 
     setup_state["phase"] = "installing_ytdlp"
@@ -225,6 +225,7 @@ def install_ytdlp():
     log.info("Downloading yt-dlp, trying %d URLs", len(urls))
     setup_state["progress"] = 50
 
+    last_err = None
     for url in urls:
         log.info("Trying: %s", url)
         try:
@@ -235,7 +236,9 @@ def install_ytdlp():
                 result = subprocess.run(cmd, capture_output=True, text=True, timeout=130,
                                        creationflags=subprocess.CREATE_NO_WINDOW if is_win else 0)
                 if result.returncode != 0:
-                    log.warning("curl failed (%d): %s", result.returncode, result.stderr[:200])
+                    err_msg = result.stderr[:300] if result.stderr else f"exit code {result.returncode}"
+                    log.warning("curl failed for %s: %s", url, err_msg)
+                    last_err = err_msg
                     continue
             else:
                 # Fallback to urllib
@@ -252,11 +255,12 @@ def install_ytdlp():
             return True
         except Exception as e:
             log.warning("Failed to download from %s: %s", url, e)
+            last_err = str(e)
             continue
 
-    msg(f"❌ Ошибка загрузки yt-dlp: все источники недоступны", "err")
-    log.error("yt-dlp installation failed from all URLs")
-    setup_state["error"] = "yt-dlp download failed (502/503/timeout)"
+    msg(f"❌ Ошибка загрузки yt-dlp: {last_err or 'все источники недоступны'}", "err")
+    log.error("yt-dlp installation failed from all URLs, last error: %s", last_err)
+    setup_state["error"] = f"yt-dlp download failed: {last_err or 'all sources unavailable'}"
     setup_state["phase"] = "error"
     return False
 
