@@ -597,6 +597,19 @@ class Handler(http.server.BaseHTTPRequestHandler):
             self._json({"ok": True})
             return
 
+        if p.path == "/open-log":
+            import subprocess as _sp, subprocess
+            log_dir = _BASE_DIR
+            log.info("/open-log (folder): %s", log_dir)
+            if platform.system() == "Windows":
+                _sp.Popen(["explorer", log_dir], creationflags=subprocess.CREATE_NO_WINDOW)
+            elif platform.system() == "Darwin":
+                _sp.Popen(["open", log_dir])
+            else:
+                _sp.Popen(["xdg-open", log_dir])
+            self._json({"ok": True})
+            return
+
         if p.path == "/status":
             # On first contact, check if setup was already done
             if setup_state["phase"] == "idle" and os.path.exists(SETUP_MARKER):

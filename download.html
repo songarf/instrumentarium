@@ -311,7 +311,7 @@
       <div class="error-toast" id="errorToast">
         <div class="title" id="errorTitle">❌ Ошибка</div>
         <div class="message" id="errorMessage"></div>
-        <div class="hint">Подробности записаны в instrumentarium.log</div>
+        <div class="hint"><a href="#" onclick="openLog(); return false;" style="color:#888;text-decoration:underline;">Подробности в instrumentarium.log</a></div>
       </div>
     </div>
 
@@ -695,6 +695,10 @@ function pollSetup() {
 
 function openFolder() {
   fetch('/open-folder', { method: 'GET' }).catch(() => {});
+}
+
+function openLog() {
+  fetch('/open-log', { method: 'GET' }).catch(() => {});
 }
 
 /* ── Download ─────────────────────────────────────────────── */
