@@ -289,7 +289,7 @@ def install_python():
         return False
 
     if system == "Darwin":
-        # Check if Homebrew Python is available but maybe just not in PATH
+        # Check if Homebrew Python is available but maybe just in a non-standard location
         homebrew_python = None
         for p in ["/opt/homebrew/bin/python3", "/usr/local/bin/python3"]:
             if os.path.isfile(p):
@@ -306,20 +306,52 @@ def install_python():
             setup_state["python_ok"] = True
             return True
 
-        # No Python — show clear instructions
-        msg("🐍 Python 3.7+ не найден", "err")
-        msg("", "info")
-        msg("Установить Python на macOS:", "info")
-        msg("   Вариант 1 (рекомендуется):", "info")
-        msg("   brew install python3", "info")
-        msg("", "info")
-        msg("   Вариант 2:", "info")
-        msg("   Скачать с https://www.python.org/downloads/macos/", "info")
-        msg("", "info")
-        msg("После установки перезапустите приложение.", "info")
-        setup_state["phase"] = "error"
-        setup_state["error"] = "Python not installed — see instructions above"
-        return False
+        # No Python — auto-download and install python.org .pkg
+        import subprocess as _sp, subprocess
+
+        # Detect architecture for correct download URL
+        import platform as _plat
+        arch = _plat.machine()  # 'arm64' or 'x86_64'
+        if arch == "arm64":
+            pkg_url = "https://www.python.org/ftp/python/3.12.4/python-3.12.4-macos11.pkg"
+            pkg_name = "python-3.12.4-macos11.pkg"
+        else:
+            pkg_url = "https://www.python.org/ftp/python/3.12.4/python-3.12.4-macosx10.9.pkg"
+            pkg_name = "python-3.12.4-macosx10.9.pkg"
+        msg(f"⬇️  Скачиваю Python 3.12 (~45 MB)…", "info")
+        log.info("Downloading macOS Python from %s", pkg_url)
+        setup_state["phase"] = "installing_python"
+        setup_state["progress"] = 5
+
+        pkg_path = os.path.join(SCRIPT_DIR, pkg_name)
+        try:
+            def _reporthook(block_num, block_size, total_size):
+                if total_size > 0:
+                    pct = min(int(block_num * block_size * 60 / total_size), 60)
+                    setup_state["progress"] = 5 + pct
+
+            urllib.request.urlretrieve(pkg_url, pkg_path, _reporthook)
+            msg("✅ Python скачен. Запускаю установщик…", "ok")
+            log.info("Python pkg downloaded: %s", pkg_path)
+            setup_state["progress"] = 70
+
+            # Install .pkg using macOS installer command
+            _sp.check_call(["/usr/bin/sudo", "/usr/bin/installer", "-pkg", pkg_path, "-target", "/"])
+            msg("✅ Python установлен!", "ok")
+            log.info("Python pkg installed successfully")
+            setup_state["progress"] = 85
+            setup_state["python_ok"] = True
+            setup_state["phase"] = "checking"
+            _clear_marker()
+            return True
+
+        except Exception as e:
+            msg(f"❌ Ошибка установки Python: {e}", "err")
+            msg(f"   Скачай вручную: https://www.python.org/downloads/macos/", "info")
+            log.error("Python installation failed: %s", e)
+            setup_state["phase"] = "error"
+            setup_state["error"] = str(e)
+            return False
 
     # Windows — auto-install
     url = get_python_install_url()
