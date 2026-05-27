@@ -25,10 +25,40 @@ def _wait_deps(handler, timeout=30):
         _t.sleep(0.5)
     handler._json({"error": "Timeout waiting for dependencies"})
 
+def _rotate_log(log_path, keep_days=5):
+    """Remove log lines older than keep_days. Each line starts with 'YYYY-MM-DD HH:MM:SS'."""
+    if not os.path.isfile(log_path):
+        return
+    try:
+        cutoff = time.time() - keep_days * 86400
+        from datetime import datetime
+        tmp_path = log_path + ".tmp"
+        kept = 0
+        total = 0
+        with open(log_path, "r", encoding="utf-8") as fin, open(tmp_path, "w", encoding="utf-8") as fout:
+            for line in fin:
+                total += 1
+                # Try to parse timestamp at start of line: "YYYY-MM-DD HH:MM:SS"
+                ts_str = line[:19] if len(line) >= 19 else ""
+                try:
+                    ts = datetime.strptime(ts_str, "%Y-%m-%d %H:%M:%S").timestamp()
+                    if ts >= cutoff:
+                        fout.write(line)
+                        kept += 1
+                    continue
+                except (ValueError, OSError):
+                    pass
+                # No valid timestamp — keep the line (could be continuation/stacktrace)
+                fout.write(line)
+                kept += 1
+        os.replace(tmp_path, log_path)
+        if total - kept > 0:
+            log.info("Log rotation: removed %d old lines, kept %d", total - kept, kept)
+    except Exception as e:
+        log.warning("Log rotation failed: %s", e)
+
 def _ensure_log_handler():
-    """Make sure the server logger has at least one handler.
-    When run from app.py, basicConfig already set up a root FileHandler
-    that this logger inherits. When run standalone, add our own."""
+    """Make sure the server logger has at least one handler."""
     if not log.handlers and not logging.getLogger().handlers:
         # Use same logic as app.py for base directory
         if hasattr(sys, "_MEIPASS"):
@@ -37,6 +67,8 @@ def _ensure_log_handler():
             _base = os.path.dirname(os.path.abspath(__file__))
         os.makedirs(_base, exist_ok=True)
         _log_path = os.path.join(_base, "instrumentarium.log")
+        # Rotate old log entries (>5 days) before starting fresh
+        _rotate_log(_log_path, keep_days=5)
         _fh = logging.FileHandler(_log_path, encoding="utf-8")
         _fh.setFormatter(logging.Formatter("%(asctime)s [%(levelname)s] %(message)s"))
         log.addHandler(_fh)
@@ -628,7 +660,15 @@ def run_setup():
     setup_state["error"] = None
     _clear_marker()
 
-    log.info("Setup started")
+    # Clear old log so user only sees current run
+    log_path = os.path.join(_BASE_DIR, "instrumentarium.log")
+    try:
+        if os.path.isfile(log_path):
+            os.remove(log_path)
+    except Exception:
+        pass
+    # Re-create empty log
+    log.info("=== Setup started (old log cleared) ===")
     msg("🔍 Проверяю зависимости…", "info")
     setup_state["progress"] = 5
 

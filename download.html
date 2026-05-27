@@ -350,6 +350,10 @@
         <span class="progress-pct" id="setupPct">0%</span>
       </div>
     </div>
+
+    <div class="setup-footer" id="setupFooter" style="display:none;margin-top:16px;text-align:center;">
+      <a href="#" id="setupLogLink" onclick="openLog();return false;" style="font-size:.7rem;color:#555;text-decoration:none;" title="Открыть папку с логом">📄 instrumentarium.log</a>
+    </div>
   </div>
 
   <!-- ═══════════════════════════════════════════════════════ -->
@@ -723,6 +727,7 @@ function startSetup() {
   btn.textContent = '⏳ Настраиваю…';
   document.getElementById('setupProgress').style.display = 'block';
   document.getElementById('setupProgress').classList.add('fade-in');
+  document.getElementById('setupFooter').style.display = 'block';
   fetch('/setup', { method: 'POST' }).then(r => r.json()).then(data => {
     if (data.already_done) {
       clearInterval(setupPoll);
@@ -762,6 +767,7 @@ function pollSetup() {
     if (d.phase === 'done') {
       clearInterval(setupPoll);
       document.getElementById('setupStatus').textContent = '✅ Всё готово! Открываю…';
+      document.getElementById('setupFooter').style.display = 'none';
       setTimeout(() => {
         document.getElementById('setupScreen').classList.remove('active');
         document.getElementById('downloadScreen').style.display = 'block';
@@ -770,6 +776,7 @@ function pollSetup() {
     }
     if (d.phase === 'error') {
       clearInterval(setupPoll);
+      document.getElementById('setupFooter').style.display = 'block';
       const btn = document.getElementById('setupBtn');
       btn.disabled = false;
       btn.textContent = '🔄 Попробовать снова';
