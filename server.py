@@ -263,7 +263,7 @@ def install_ytdlp():
         try:
             # Use curl for better proxy/redirect support
             if shutil.which("curl"):
-                cmd = ["curl", "-L", "-f", "--connect-timeout", "15", "--max-time", "120",
+                cmd = ["curl", "-s", "-L", "-f", "--connect-timeout", "15", "--max-time", "120",
                        "-o", YT_DLP, url]
                 result = subprocess.run(cmd, capture_output=True, text=True, timeout=130,
                                        creationflags=subprocess.CREATE_NO_WINDOW if is_win else 0)
@@ -786,14 +786,14 @@ class Handler(http.server.BaseHTTPRequestHandler):
 
         if p.path == "/open-log":
             import subprocess as _sp, subprocess
-            log_dir = _BASE_DIR
-            log.info("/open-log (folder): %s", log_dir)
-            if platform.system() == "Windows":
-                _sp.Popen(["explorer", log_dir], creationflags=subprocess.CREATE_NO_WINDOW)
-            elif platform.system() == "Darwin":
-                _sp.Popen(["open", log_dir])
+            log_path = os.path.join(_BASE_DIR, "instrumentarium.log")
+            log.info("/open-log: base_dir=%s log_path=%s exists=%s", _BASE_DIR, log_path, os.path.isfile(log_path))
+            if platform.system() == "Darwin":
+                _sp.Popen(["open", log_path])
+            elif platform.system() == "Windows":
+                _sp.Popen(["explorer", "/select,", log_path], creationflags=subprocess.CREATE_NO_WINDOW)
             else:
-                _sp.Popen(["xdg-open", log_dir])
+                _sp.Popen(["xdg-open", log_path])
             self._json({"ok": True})
             return
 
