@@ -573,7 +573,7 @@ def _map_ytdlp_error(err_text):
     if "age" in err or "restricted" in err:
         return "Видео с возрастным ограничением — нужны cookies"
     # Fallback: return a generic friendly message
-    return "Не удалось обработать ссылку — проверьте правильность или попробуйте позже"
+    return "Не удалось обработать ссылку — проверьте правильность или используйте cookies 👇🏻"
 
 # ── HTTP handler ────────────────────────────────────────────────────
 class Handler(http.server.BaseHTTPRequestHandler):

@@ -350,7 +350,7 @@
       <div style="position:relative;display:inline-block;margin-bottom:12px;">
         <span style="font-size:.72rem;color:#666;">Как получить cookies.txt</span>
         <span class="cookie-help-anchor" style="display:inline-flex;align-items:center;justify-content:center;width:16px;height:16px;border-radius:50%;border:1px solid #555;font-size:.6rem;color:#888;cursor:help;vertical-align:middle;margin-left:4px;">?</span>
-        <span class="cookie-help-tooltip" style="display:none;position:absolute;bottom:140%;left:0;background:#1a1a2e;border:1px solid #2a2a4a;border-radius:8px;padding:10px 14px;font-size:.7rem;color:#ccc;width:260px;line-height:1.5;box-shadow:0 4px 16px rgba(0,0,0,.4);z-index:100;pointer-events:none;">Установите расширение <strong>Get cookies.txt LOCALLY</strong> → откройте linkedin.com → нажмите на расширение → <strong>Export</strong> → перетащите файл сюда</span>
+        <span class="cookie-help-tooltip" style="display:none;position:absolute;bottom:140%;left:0;background:#1a1a2e;border:1px solid #2a2a4a;border-radius:8px;padding:10px 14px;font-size:.7rem;color:#ccc;width:260px;line-height:1.5;box-shadow:0 4px 16px rgba(0,0,0,.4);z-index:100;pointer-events:none;">Установите расширение <strong>Get cookies.txt LOCALLY</strong> → откройте нужную страницу и войдите в аккаунт → нажмите на расширение → <strong>Export</strong> → перетащите файл сюда</span>
       </div>
       <div style="display:flex;gap:8px;justify-content:flex-end;">
         <button class="btn" onclick="closeCookiesDialog()" style="padding:10px 20px;background:none;border:1px solid #2a2a4a;border-radius:10px;color:#888;cursor:pointer;font-size:.85rem;">Отмена</button>
@@ -831,6 +831,16 @@ function closeCookiesDialog() {
   document.getElementById('cookiesDialog').style.display = 'none';
 }
 
+function closeCookiesDialogAndRetry() {
+  document.getElementById('cookiesDialog').style.display = 'none';
+  // Clear error and re-probe current URL in case cookies fixed the issue
+  const url = document.getElementById('urlInput').value.trim();
+  if (url && isValidUrl(url)) {
+    hideError();
+    scheduleProbe(url);
+  }
+}
+
 function saveCookies() {
   const content = document.getElementById('cookiesContent').value.trim();
   const status = document.getElementById('cookiesStatus');
@@ -872,7 +882,7 @@ function saveCookies() {
       status.style.color = '#4caf50';
       if (btn) { btn.textContent = '✅ Готово'; btn.style.opacity = '1'; }
       // Auto-close after 1.2s
-      setTimeout(() => closeCookiesDialog(), 1200);
+      setTimeout(() => closeCookiesDialogAndRetry(), 1200);
     } else {
       status.textContent = '❌ ' + (data.error || 'Ошибка сервера');
       status.style.color = '#ff4757';
