@@ -9,7 +9,7 @@
 
   body {
     font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
-    background: #0f0f1a;
+    background: linear-gradient(145deg, #0a0a1a 0%, #0f0f2e 50%, #0a0a1a 100%);
     color: #e0e0e0;
     min-height: 100vh;
     display: flex;
@@ -19,135 +19,189 @@
     padding: 16px 0;
   }
 
+  /* ── Card ─────────────────────────────────────────────────── */
   .card {
-    background: #1a1a2e;
-    border: 1px solid #2a2a4a;
-    border-radius: 16px;
-    padding: 24px;
+    background: #12122a;
+    border: 1px solid #1e1e3f;
+    border-radius: 20px;
+    padding: 28px;
     width: 540px;
     max-width: 95vw;
-    box-shadow: 0 20px 60px rgba(0,0,0,.5);
+    box-shadow: 0 24px 80px rgba(0,0,0,.6), 0 0 120px rgba(108,92,231,.05);
   }
 
-  h1 { font-size: 1.2rem; margin-bottom: 4px; color: #fff; }
-  .subtitle { font-size: .78rem; color: #666; margin-bottom: 16px; line-height: 1.4; }
-
-  /* ── Setup screen ──────────────────────────────────────── */
+  /* ═══════════════════════════════════════════════════════════ */
+  /* SETUP SCREEN                                              */
+  /* ═══════════════════════════════════════════════════════════ */
   .setup-screen { text-align: center; display: none; }
   .setup-screen.active { display: block; }
 
-  .setup-icon {
-    font-size: 2.5rem; margin-bottom: 10px;
-    animation: pulse 2s ease-in-out infinite;
-  }
-  @keyframes pulse {
-    0%, 100% { transform: scale(1); }
-    50% { transform: scale(1.08); }
+  .setup-badge {
+    display: inline-block;
+    background: linear-gradient(135deg, rgba(108,92,231,.15), rgba(167,139,250,.15));
+    border: 1px solid rgba(108,92,231,.3);
+    border-radius: 20px;
+    padding: 4px 14px;
+    font-size: .7rem;
+    color: #a78bfa;
+    font-weight: 600;
+    letter-spacing: .04em;
+    margin-bottom: 20px;
   }
 
-  .setup-title { font-size: 1rem; color: #fff; margin-bottom: 6px; }
-  .setup-desc { font-size: .78rem; color: #888; margin-bottom: 18px; line-height: 1.5; }
+  .setup-gear {
+    width: 90px; height: 90px;
+    margin: 0 auto 18px;
+    background: linear-gradient(135deg, #6c5ce7, #a78bfa);
+    border-radius: 50%;
+    display: flex; align-items: center; justify-content: center;
+    box-shadow: 0 0 40px rgba(108,92,231,.35), 0 0 80px rgba(108,92,231,.1);
+    animation: pulse-glow 3s ease-in-out infinite;
+  }
+  .setup-gear svg { width: 44px; height: 44px; fill: #fff; }
+  @keyframes pulse-glow {
+    0%, 100% { box-shadow: 0 0 40px rgba(108,92,231,.35), 0 0 80px rgba(108,92,231,.1); }
+    50% { box-shadow: 0 0 50px rgba(108,92,231,.5), 0 0 100px rgba(108,92,231,.15); }
+  }
+
+  .setup-title { font-size: 1.15rem; color: #fff; margin-bottom: 8px; font-weight: 700; }
+  .setup-desc { font-size: .78rem; color: #777; margin-bottom: 20px; line-height: 1.6; }
+
+  .setup-checklist {
+    display: flex; gap: 10px; margin-bottom: 22px;
+  }
+  .checklist-item {
+    flex: 1;
+    background: rgba(255,255,255,.03);
+    border: 1px solid rgba(255,255,255,.06);
+    border-radius: 12px;
+    padding: 12px 8px;
+    text-align: center;
+  }
+  .checklist-item .check-icon {
+    font-size: 1.3rem; margin-bottom: 6px; display: block;
+  }
+  .checklist-item .check-label {
+    font-size: .72rem; color: #aaa; display: block; font-weight: 600;
+  }
+  .checklist-item .check-sub {
+    font-size: .65rem; color: #555; display: block; margin-top: 2px;
+  }
 
   .setup-btn {
     display: inline-flex; align-items: center; gap: 10px;
-    padding: 12px 28px;
-    background: linear-gradient(135deg, #6c5ce7, #a78bfa);
-    border: none; border-radius: 12px; color: #fff;
-    font-size: .95rem; font-weight: 600; cursor: pointer;
+    padding: 14px 36px;
+    background: linear-gradient(135deg, #e056a0, #a78bfa);
+    border: none; border-radius: 14px; color: #fff;
+    font-size: 1rem; font-weight: 700; cursor: pointer;
     transition: transform .15s, box-shadow .15s;
+    box-shadow: 0 8px 30px rgba(224,86,160,.3);
   }
-  .setup-btn:hover { transform: translateY(-2px); box-shadow: 0 8px 28px rgba(108,92,231,.45); }
+  .setup-btn:hover { transform: translateY(-2px); box-shadow: 0 12px 40px rgba(224,86,160,.4); }
   .setup-btn:disabled { opacity: .5; cursor: wait; transform: none; box-shadow: none; }
 
-  /* ── Progress ───────────────────────────────────────────── */
   .progress-section { margin-top: 24px; text-align: left; }
-
-  .progress-bg {
-    background: #12122a; border-radius: 8px; height: 8px; overflow: hidden;
-  }
+  .progress-bg { background: #0a0a1a; border-radius: 8px; height: 6px; overflow: hidden; }
   .progress-bar {
     height: 100%; width: 0%;
-    background: linear-gradient(90deg, #6c5ce7, #a78bfa, #6c5ce7);
-    background-size: 200% 100%;
-    border-radius: 8px;
-    transition: width .5s ease;
-    animation: shimmer 1.5s linear infinite;
+    background: linear-gradient(90deg, #e056a0, #a78bfa, #e056a0);
+    background-size: 200% 100%; border-radius: 8px;
+    transition: width .5s ease; animation: shimmer 1.5s linear infinite;
   }
-  .progress-bar.done {
-    animation: none;
-    background: #4caf50;
-  }
-  @keyframes shimmer {
-    0% { background-position: 200% 0; }
-    100% { background-position: -200% 0; }
-  }
+  .progress-bar.done { animation: none; background: #4caf50; }
+  @keyframes shimmer { 0% { background-position: 200% 0; } 100% { background-position: -200% 0; } }
 
   .progress-label {
     display: flex; justify-content: space-between; align-items: center;
-    margin-top: 8px; font-size: .78rem;
+    margin-top: 8px; font-size: .72rem;
   }
   .progress-pct { color: #a78bfa; font-weight: 600; }
-  .progress-status { color: #888; }
+  .progress-status { color: #666; }
 
-  /* ── Download screen ────────────────────────────────────── */
+  /* ═══════════════════════════════════════════════════════════ */
+  /* DOWNLOAD SCREEN                                           */
+  /* ═══════════════════════════════════════════════════════════ */
   .download-screen { display: none; }
 
-  .url-input-row {
-    display: flex; gap: 6px; margin-bottom: 8px; align-items: center;
+  .dl-header {
+    display: flex; align-items: flex-start; justify-content: space-between;
+    margin-bottom: 18px;
+  }
+  .dl-header-left h1 {
+    font-size: 1.1rem; color: #fff; font-weight: 700;
+    display: flex; align-items: center; gap: 8px;
+  }
+  .dl-header-left h1 .header-icon {
+    font-size: 1.2rem;
+  }
+  .dl-header-left .subtitle {
+    font-size: .72rem; color: #555; margin-top: 4px; line-height: 1.5;
+  }
+  .dl-header-right {
+    display: flex; gap: 8px; padding-top: 2px;
+  }
+  .header-ico-btn {
+    width: 32px; height: 32px; border-radius: 8px;
+    border: 1px solid #2a2a4a; background: rgba(255,255,255,.03);
+    color: #666; cursor: pointer; font-size: .85rem;
+    display: flex; align-items: center; justify-content: center;
+    transition: all .2s;
+  }
+  .header-ico-btn:hover { border-color: #4a4a6a; color: #aaa; background: rgba(255,255,255,.06); }
+
+  /* ── Input ────────────────────────────────────────────────── */
+  .input-group { margin-bottom: 14px; }
+  .input-group label {
+    display: block; font-size: .68rem; text-transform: uppercase;
+    letter-spacing: .1em; color: #555; margin-bottom: 6px; font-weight: 600;
   }
 
-  label {
-    display: block; font-size: .72rem; text-transform: uppercase;
-    letter-spacing: .08em; color: #888; margin-bottom: 6px;
+  .url-input-wrap {
+    display: flex; align-items: center; position: relative;
   }
-
-  #urlInput {
-    flex: 1; background: #12122a; border: 1px solid #2a2a4a;
-    border-radius: 10px; padding: 10px 14px; color: #e0e0e0;
-    font-size: .9rem; outline: none; transition: border .2s;
+  .url-input-wrap .input-chain {
+    position: absolute; left: 12px; color: #444; font-size: .9rem; pointer-events: none;
   }
-
-  .clear-btn {
-    background: none; border: 1px solid #2a2a4a; border-radius: 10px;
-    padding: 10px 12px; color: #888; cursor: pointer; font-size: .9rem;
-    transition: all .2s; flex-shrink: 0;
+  .url-input-wrap input {
+    flex: 1;
+    background: #0a0a1a;
+    border: 1px solid #1e1e3f;
+    border-radius: 12px;
+    padding: 11px 40px 11px 38px;
+    color: #e0e0e0; font-size: .85rem;
+    outline: none; transition: border .2s;
   }
-
-  .platform-badge {
-    display: inline-block; background: #12122a; border: 1px solid #2a2a4a;
-    border-radius: 6px; padding: 2px 8px; font-size: .7rem; color: #888;
-    margin-bottom: 10px; opacity: 0; transition: opacity .3s;
+  .url-input-wrap input:focus { border-color: #6c5ce7; }
+  .url-input-wrap input::placeholder { color: #444; }
+  .url-input-wrap .input-clipboard {
+    position: absolute; right: 10px; color: #444; cursor: pointer; font-size: .85rem;
+    transition: color .2s; background: none; border: none; padding: 4px;
   }
-  .platform-badge.visible { opacity: 1; }
-  .platform-youtube { color: #ff4757; border-color: #ff4757; }
-  .platform-twitter { color: #1da1f2; border-color: #1da1f2; }
-  .platform-tiktok { color: #ff0050; border-color: #ff0050; }
-  .platform-instagram { color: #e1306c; border-color: #e1306c; }
-  .platform-facebook { color: #1877f2; border-color: #1877f2; }
-  .platform-linkedin { color: #0077b5; border-color: #0077b5; }
-  .platform-other { color: #a78bfa; border-color: #a78bfa; }
+  .url-input-wrap .input-clipboard:hover { color: #a78bfa; }
 
-  /* ── Mode toggle ────────────────────────────────────────── */
-  .options { display: flex; gap: 8px; margin-bottom: 10px; }
+  /* ── Mode toggle ──────────────────────────────────────────── */
+  .options { display: flex; gap: 8px; margin-bottom: 12px; }
   .opt-btn {
-    flex: 1; background: #12122a; border: 1px solid #2a2a4a;
-    border-radius: 10px; padding: 10px 8px; text-align: center;
-    cursor: pointer; transition: all .2s; font-size: .8rem; color: #888;
-    user-select: none;
+    flex: 1; background: rgba(255,255,255,.03); border: 1px solid rgba(255,255,255,.06);
+    border-radius: 12px; padding: 10px 8px; text-align: center;
+    cursor: pointer; transition: all .2s; font-size: .78rem; color: #666;
+    user-select: none; font-weight: 600;
   }
-  .opt-btn:hover { border-color: #4a4a6a; color: #ccc; }
-  .opt-btn.active { border-color: #6c5ce7; background: #1a1040; color: #a78bfa; }
-  .opt-btn .icon { font-size: 1.3rem; display: block; margin-bottom: 3px; }
+  .opt-btn:hover { border-color: #4a4a6a; color: #aaa; }
+  .opt-btn.active {
+    border-color: rgba(108,92,231,.5);
+    background: linear-gradient(135deg, rgba(108,92,231,.12), rgba(167,139,250,.08));
+    color: #a78bfa;
+    box-shadow: 0 0 20px rgba(108,92,231,.1);
+  }
+  .opt-btn .icon { font-size: 1.2rem; display: block; margin-bottom: 3px; }
 
-  /* ── Hidden utility ──────────────────────────────────────── */
+  /* ── Hidden utility ───────────────────────────────────────── */
   .hidden { display: none !important; }
 
-  /* ── Download buttons container (video res / audio) ──────── */
-  .dl-options {
-    min-height: 120px;
-  }
+  /* ── Download buttons container ───────────────────────────── */
+  .dl-options { min-height: 100px; }
 
-  /* ── Resolution / audio download buttons ─────────────────── */
   .res-buttons {
     display: flex; flex-direction: column; gap: 8px; margin-bottom: 8px;
   }
@@ -157,105 +211,135 @@
     display: flex; align-items: center; justify-content: space-between;
     width: 100%; padding: 12px 16px;
     background: linear-gradient(135deg, #6c5ce7, #a78bfa);
-    border: none; border-radius: 10px; color: #fff;
-    font-size: .9rem; font-weight: 600; cursor: pointer;
+    border: none; border-radius: 12px; color: #fff;
+    font-size: .88rem; font-weight: 600; cursor: pointer;
     transition: transform .15s, box-shadow .15s;
+    box-shadow: 0 4px 16px rgba(108,92,231,.2);
   }
-  .res-btn:hover { transform: translateY(-2px); box-shadow: 0 8px 24px rgba(108,92,231,.4); }
+  .res-btn:hover { transform: translateY(-2px); box-shadow: 0 8px 28px rgba(108,92,231,.35); }
   .res-btn:disabled { opacity: .5; cursor: wait; transform: none; box-shadow: none; }
-  .res-btn .res-label { font-size: .95rem; }
-  .res-btn .res-meta {
-    font-size: .75rem; color: rgba(255,255,255,.7); text-align: right;
-    line-height: 1.3;
+  .res-btn .res-label { font-size: .9rem; }
+  .res-btn .res-meta { font-size: .7rem; color: rgba(255,255,255,.7); text-align: right; line-height: 1.3; }
+
+  .audio-btn-left { display: flex; align-items: center; gap: 10px; }
+  .audio-btn-left .bitrate { font-size: .9rem; }
+  .audio-btn-left .abr-badge {
+    background: rgba(255,255,255,.15); border-radius: 6px; padding: 2px 8px; font-size: .65rem;
   }
 
-  /* ── Big downloads button ──────────────────────────────── */
+  /* ── Downloads button ─────────────────────────────────────── */
   .big-downloads-btn {
-    width: 100%; padding: 12px; margin-top: 12px;
-    background: linear-gradient(135deg, #2a2a4a, #3a3a5a);
-    border: 1px solid #4a4a6a; border-radius: 10px; color: #a78bfa;
-    font-size: .9rem; font-weight: 600; cursor: pointer;
-    transition: all .2s;
+    width: 100%; padding: 13px; margin-top: 14px;
+    background: linear-gradient(135deg, rgba(108,92,231,.15), rgba(167,139,250,.1));
+    border: 1px solid rgba(108,92,231,.25); border-radius: 12px; color: #a78bfa;
+    font-size: .9rem; font-weight: 700; cursor: pointer;
+    transition: all .2s; display: flex; align-items: center; justify-content: center; gap: 8px;
   }
   .big-downloads-btn:hover {
-    background: linear-gradient(135deg, #3a3a5a, #4a4a6a);
-    border-color: #6c5ce7;
+    background: linear-gradient(135deg, rgba(108,92,231,.25), rgba(167,139,250,.15));
+    border-color: rgba(108,92,231,.4);
     transform: translateY(-1px);
   }
 
   .dl-progress { margin-top: 12px; }
-  .dl-status { font-size: .78rem; color: #888; margin-top: 6px; }
+  .dl-status { font-size: .75rem; color: #555; margin-top: 6px; }
 
-  /* ── Probing spinner ────────────────────────────────────── */
-  .probing {
-    display: none; text-align: center; padding: 12px; color: #888;
-    font-size: .82rem;
-  }
+  /* ── Probing spinner ──────────────────────────────────────── */
+  .probing { display: none; text-align: center; padding: 12px; color: #555; font-size: .8rem; }
   .probing.visible { display: block; }
   .probing .spinner {
-    display: inline-block; width: 16px; height: 16px;
+    display: inline-block; width: 14px; height: 14px;
     border: 2px solid #2a2a4a; border-top-color: #a78bfa;
     border-radius: 50%; animation: spin .8s linear infinite;
     vertical-align: middle; margin-right: 8px;
   }
   @keyframes spin { to { transform: rotate(360deg); } }
 
-  /* ── Error notification ─────────────────────────────────── */
+  /* ── Error notification ───────────────────────────────────── */
   .error-toast {
-    display: none; margin-top: 12px; padding: 12px 16px;
-    background: #2a1010; border: 1px solid #ff4757; border-radius: 10px;
-    font-size: .82rem; color: #ff4757; line-height: 1.5;
+    display: none; margin-top: 12px; padding: 12px 14px;
+    background: rgba(255,71,87,.06); border: 1px solid rgba(255,71,87,.2); border-radius: 10px;
+    font-size: .78rem; color: #ff6b6b; line-height: 1.5;
   }
   .error-toast.visible { display: block; animation: fadeIn .3s ease; }
-  .error-toast .title { font-weight: 600; margin-bottom: 4px; }
-  .error-toast .hint { font-size: .72rem; color: #888; margin-top: 6px; }
+  .error-toast .title { font-weight: 700; margin-bottom: 4px; }
+  .error-toast .hint { font-size: .68rem; color: #555; margin-top: 6px; }
+  .error-toast .hint a { color: #555; text-decoration: underline; }
+  .error-toast .hint a:hover { color: #a78bfa; }
 
+  /* ── Footer ───────────────────────────────────────────────── */
   .footer {
-    margin-top: 12px; font-size: .68rem; color: #444; text-align: center;
+    margin-top: 14px; font-size: .68rem; color: #333; text-align: center;
+    display: flex; align-items: center; justify-content: center; gap: 4px;
   }
+  .footer .cookie-link {
+    cursor: pointer; color: #444; transition: color .2s;
+    background: none; border: none; font-size: .68rem; padding: 0;
+  }
+  .footer .cookie-link:hover { color: #a78bfa; }
 
-  /* ── Cookie tooltip on hover ─────────────────────────────── */
+  /* ── Video title ──────────────────────────────────────────── */
+  .video-title {
+    display: none; font-size: .78rem; color: #888; margin-bottom: 8px;
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 100%;
+  }
+  .video-title.visible { display: block; }
 
-  /* ── Tooltip animations ───────────────────────────────────── */
+  /* ── Transitions ──────────────────────────────────────────── */
+  .fade-in { animation: fadeIn .4s ease; }
+  @keyframes fadeIn { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
+
   @keyframes shake {
     0%, 100% { transform: translateX(0); }
     25% { transform: translateX(-4px); }
     75% { transform: translateX(4px); }
   }
 
-  /* ── Video title shown after probe ──────────────────────── */
-  .video-title {
-    display: none; font-size: .8rem; color: #ccc; margin-bottom: 8px;
-    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
-    max-width: 100%;
-  }
-  .video-title.visible { display: block; }
-
-  /* ── Transitions ────────────────────────────────────────── */
-  .fade-in { animation: fadeIn .4s ease; }
-  @keyframes fadeIn { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
-
-  /* ── Button press animation ──────────────────────────────── */
-  .btn:active, .btn-primary:active {
-    transform: scale(.96);
-    transition: transform .1s ease;
-  }
+  /* ── Button press ─────────────────────────────────────────── */
+  .btn:active, .btn-primary:active { transform: scale(.96); transition: transform .1s ease; }
   .btn, .btn-primary { transition: transform .1s ease, opacity .2s ease; }
+
+  /* ── Mobile ───────────────────────────────────────────────── */
+  @media (max-width: 500px) {
+    .card { padding: 20px; border-radius: 16px; }
+    .setup-checklist { flex-direction: column; }
+    .dl-header-right { display: none; }
+  }
 </style>
 </head>
 <body>
 <div class="card">
 
   <!-- ═══════════════════════════════════════════════════════ -->
-  <!-- SETUP SCREEN                                           -->
+  <!-- SETUP SCREEN                                          -->
   <!-- ═══════════════════════════════════════════════════════ -->
   <div class="setup-screen" id="setupScreen">
-    <div class="setup-icon">⚙️</div>
+    <div class="setup-badge">Добро пожаловать</div>
+
+    <div class="setup-gear">
+      <svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+        <path d="M12 15.5A3.5 3.5 0 0 1 8.5 12 3.5 3.5 0 0 1 12 8.5a3.5 3.5 0 0 1 3.5 3.5 3.5 3.5 0 0 1-3.5 3.5m7.43-2.53c.04-.32.07-.64.07-.97 0-.33-.03-.66-.07-1l2.11-1.63c.19-.15.24-.42.12-.64l-2-3.46c-.12-.22-.39-.31-.61-.22l-2.49 1c-.52-.39-1.06-.73-1.69-.98l-.37-2.65A.506.506 0 0 0 14 2h-4c-.25 0-.46.18-.5.42l-.37 2.65c-.63.25-1.17.59-1.69.98l-2.49-1c-.22-.09-.49 0-.61.22l-2 3.46c-.13.22-.07.49.12.64L4.57 11c-.04.34-.07.67-.07 1 0 .33.03.65.07.97l-2.11 1.66c-.19.15-.25.42-.12.64l2 3.46c.12.22.39.3.61.22l2.49-1.01c.52.4 1.06.74 1.69.99l.37 2.65c.04.24.25.42.5.42h4c.25 0 .46-.18.5-.42l.37-2.65c.63-.26 1.17-.59 1.69-.99l2.49 1.01c.22.08.49 0 .61-.22l2-3.46c.12-.22.07-.49-.12-.64l-2.11-1.66Z"/>
+      </svg>
+    </div>
+
     <div class="setup-title">Первоначальная настройка</div>
     <div class="setup-desc">
-      Проверим и установим всё необходимое для скачивания видео.<br>
-      Python 3.7+, yt-dlp и папка для загрузок — всё автоматически.
+      Проверяем и установим всё необходимое для скачивания видео.
     </div>
+
+    <div class="setup-checklist">
+      <div class="checklist-item">
+        <span class="check-icon">🐍</span>
+        <span class="check-label">Python 3.7+</span>
+        <span class="check-sub">Проверка</span>
+      </div>
+      <div class="checklist-item">
+        <span class="check-icon">📁</span>
+        <span class="check-label">yt-dlp и папка</span>
+        <span class="check-sub">Настройка</span>
+      </div>
+    </div>
+
     <button class="setup-btn" id="setupBtn" onclick="startSetup()">
       🚀 Настроить и запустить
     </button>
@@ -270,18 +354,28 @@
   </div>
 
   <!-- ═══════════════════════════════════════════════════════ -->
-  <!-- DOWNLOAD SCREEN                                        -->
+  <!-- DOWNLOAD SCREEN                                       -->
   <!-- ═══════════════════════════════════════════════════════ -->
   <div class="download-screen" id="downloadScreen">
-    <h1>🎬 Video Downloader</h1>
-    <p class="subtitle">Скачай видео с YouTube, Twitter/X, TikTok, Instagram, Facebook, LinkedIn и 1000+ сайтов</p>
-
-    <label>Ссылка на видео</label>
-    <div class="url-input-row">
-      <input type="url" id="urlInput" placeholder="Вставь ссылку на видео…" autocomplete="off" autofocus>
-      <button class="clear-btn" onclick="clearUrl()" title="Очистить">✕</button>
+    <div class="dl-header">
+      <div class="dl-header-left">
+        <h1><span class="header-icon">🎬</span> Video Downloader</h1>
+        <p class="subtitle">Скачай видео с YouTube, Twitter/X, TikTok, Instagram, Facebook, LinkedIn и 1000+ сайтов</p>
+      </div>
+      <div class="dl-header-right">
+        <button class="header-ico-btn" title="Настройки">⚙️</button>
+        <button class="header-ico-btn" title="Тёмная тема">🌙</button>
+      </div>
     </div>
-    <div class="platform-badge" id="badge">…</div>
+
+    <div class="input-group">
+      <label>Ссылка на видео</label>
+      <div class="url-input-wrap">
+        <span class="input-chain">🔗</span>
+        <input type="url" id="urlInput" placeholder="Вставь ссылку на видео…" autocomplete="off" autofocus>
+        <button class="input-clipboard" onclick="pasteClipboard()" title="Вставить из буфера">📋</button>
+      </div>
+    </div>
 
     <div class="probing" id="probing">
       <span class="spinner"></span> Определяю доступные форматы…
@@ -289,7 +383,7 @@
 
     <div class="video-title" id="videoTitle"></div>
 
-    <!-- Mode toggle: only visible after successful probe -->
+    <!-- Mode toggle -->
     <div class="options hidden" id="modeRow">
       <div class="opt-btn active" id="optVideo" onclick="setMode('video')">
         <span class="icon">🎥</span>Видео (MP4)
@@ -299,10 +393,9 @@
       </div>
     </div>
 
-    <!-- Download buttons container: fixed height to prevent layout shift -->
     <div class="dl-options" id="dlOptions">
       <div class="res-buttons" id="resButtons"></div>
-      <div class="res-buttons" id="audioButtons"></div>
+      <div class="res-buttons audio-only" id="audioButtons"></div>
     </div>
 
     <div class="dl-progress" id="dlProgress" style="display:none">
@@ -311,17 +404,18 @@
       <div class="error-toast" id="errorToast">
         <div class="title" id="errorTitle">❌ Ошибка</div>
         <div class="message" id="errorMessage"></div>
-        <div class="hint"><a href="#" onclick="openLog(); return false;" style="color:#888;text-decoration:underline;">Подробности в instrumentarium.log</a></div>
+        <div class="hint"><a href="#" onclick="openLog(); return false;">Подробности в instrumentarium.log</a></div>
       </div>
     </div>
 
-    <!-- Big Downloads button at bottom -->
-    <button class="big-downloads-btn" onclick="openFolder()">📁 Загрузки</button>
+    <button class="big-downloads-btn" onclick="openFolder()">
+      ⬇️ Загрузки
+    </button>
 
     <p class="footer">
-      <span onclick="showCookiesDialog()" style="cursor:pointer;text-decoration:underline;">🍪 Cookies</span>
-      <span class="cookie-tooltip-anchor" style="display:inline-flex;align-items:center;justify-content:center;width:18px;height:18px;border-radius:50%;border:1px solid #555;font-size:.65rem;color:#888;cursor:help;margin-left:4px;vertical-align:middle;position:relative;">?
-        <span class="cookie-tooltip" style="display:none;position:absolute;bottom:140%;left:50%;transform:translateX(-50%);background:#1a1a2e;border:1px solid #2a2a4a;border-radius:8px;padding:8px 12px;font-size:.7rem;color:#ccc;width:220px;text-align:center;line-height:1.4;box-shadow:0 4px 16px rgba(0,0,0,.4);z-index:100;pointer-events:none;">Используйте cookies, чтобы скачать видео из приватных страниц, доступных только после входа в аккаунт</span>
+      <button class="cookie-link" onclick="showCookiesDialog()">🍪 Cookies</button>
+      <span class="cookie-tooltip-anchor" style="display:inline-flex;align-items:center;justify-content:center;width:16px;height:16px;border-radius:50%;border:1px solid #333;font-size:.6rem;color:#444;cursor:help;vertical-align:middle;position:relative;">?
+        <span class="cookie-tooltip" style="display:none;position:absolute;bottom:140%;left:50%;transform:translateX(-50%);background:#12122a;border:1px solid #1e1e3f;border-radius:8px;padding:8px 12px;font-size:.65rem;color:#888;width:220px;text-align:center;line-height:1.4;box-shadow:0 4px 20px rgba(0,0,0,.5);z-index:100;pointer-events:none;">Используйте cookies, чтобы скачать видео из приватных страниц, доступных только после входа в аккаунт</span>
       </span>
     </p>
   </div>
@@ -330,34 +424,32 @@
   <!-- COOKIES DIALOG                                        -->
   <!-- ═══════════════════════════════════════════════════════ -->
   <div id="cookiesDialog" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.7);z-index:999;align-items:center;justify-content:center;">
-    <div style="background:#1a1a2e;border:1px solid #2a2a4a;border-radius:16px;padding:24px;width:520px;max-width:95vw;box-shadow:0 20px 60px rgba(0,0,0,.5);">
-      <h2 style="font-size:1rem;margin-bottom:6px;color:#fff;">🍪 Cookies</h2>
-      <p style="font-size:.78rem;color:#888;margin-bottom:6px;line-height:1.5;">
+    <div style="background:#12122a;border:1px solid #1e1e3f;border-radius:20px;padding:24px;width:520px;max-width:95vw;box-shadow:0 24px 80px rgba(0,0,0,.6);">
+      <h2 style="font-size:1rem;margin-bottom:6px;color:#fff;font-weight:700;">🍪 Cookies</h2>
+      <p style="font-size:.75rem;color:#555;margin-bottom:10px;line-height:1.5;">
         Перетащите файл cookies.txt или нажмите на область ниже. Также можно вставить текст вручную.
       </p>
-      <!-- Drag & drop zone -->
       <div id="cookieDropzone"
            onclick="document.getElementById('cookieFileInput').click()"
-           style="border:2px dashed #2a2a4a;border-radius:12px;padding:24px;text-align:center;cursor:pointer;margin-bottom:12px;transition:border-color .2s,background .2s;">
+           style="border:2px dashed #1e1e3f;border-radius:14px;padding:24px;text-align:center;cursor:pointer;margin-bottom:14px;transition:border-color .2s,background .2s;">
         <div style="font-size:2rem;margin-bottom:6px;">📄</div>
-        <div style="font-size:.82rem;color:#888;">Перетащите файл <strong>cookies.txt</strong> сюда<br>или нажмите для выбора</div>
+        <div style="font-size:.78rem;color:#555;">Перетащите файл <strong>cookies.txt</strong> сюда<br>или нажмите для выбора</div>
         <input type="file" id="cookieFileInput" accept=".txt,text/plain" style="display:none">
       </div>
 
-      <textarea id="cookiesContent" rows="4" placeholder="…или вставьте содержимое cookies.txt сюда"
-        style="width:100%;background:#12122a;border:1px solid #2a2a4a;border-radius:10px;padding:10px 14px;color:#e0e0e0;font-size:.78rem;outline:none;margin-bottom:12px;resize:vertical;font-family:monospace;box-sizing:border-box;"></textarea>
-      <!-- Cookie help tooltip -->
-      <div style="position:relative;display:inline-block;margin-bottom:12px;">
-        <span style="font-size:.72rem;color:#666;">Как получить cookies.txt</span>
-        <span class="cookie-help-anchor" style="display:inline-flex;align-items:center;justify-content:center;width:16px;height:16px;border-radius:50%;border:1px solid #555;font-size:.6rem;color:#888;cursor:help;vertical-align:middle;margin-left:4px;">?</span>
-        <span class="cookie-help-tooltip" style="display:none;position:absolute;bottom:140%;left:0;background:#1a1a2e;border:1px solid #2a2a4a;border-radius:8px;padding:10px 14px;font-size:.7rem;color:#ccc;width:260px;line-height:1.5;box-shadow:0 4px 16px rgba(0,0,0,.4);z-index:100;pointer-events:none;">Установите расширение <strong>Get cookies.txt LOCALLY</strong> → откройте нужную страницу и войдите в аккаунт → нажмите на расширение → <strong>Export</strong> → перетащите файл сюда</span>
+      <textarea id="cookiesContent" rows="3" placeholder="…или вставьте содержимое cookies.txt сюда"
+        style="width:100%;background:#0a0a1a;border:1px solid #1e1e3f;border-radius:12px;padding:10px 14px;color:#e0e0e0;font-size:.75rem;outline:none;margin-bottom:12px;resize:vertical;font-family:monospace;box-sizing:border-box;"></textarea>
+      <div style="position:relative;display:inline-block;margin-bottom:14px;">
+        <span style="font-size:.7rem;color:#444;">Как получить cookies.txt</span>
+        <span class="cookie-help-anchor" style="display:inline-flex;align-items:center;justify-content:center;width:14px;height:14px;border-radius:50%;border:1px solid #333;font-size:.55rem;color:#555;cursor:help;vertical-align:middle;margin-left:4px;">?</span>
+        <span class="cookie-help-tooltip" style="display:none;position:absolute;bottom:140%;left:0;background:#12122a;border:1px solid #1e1e3f;border-radius:8px;padding:10px 14px;font-size:.68rem;color:#888;width:260px;line-height:1.5;box-shadow:0 4px 20px rgba(0,0,0,.5);z-index:100;pointer-events:none;">Установите браузерное расширение <strong>Get cookies.txt LOCALLY</strong> → откройте нужную страницу и войдите в аккаунт → нажмите на расширение → <strong>Export</strong> → перетащите файл сюда</span>
       </div>
       <div style="display:flex;gap:8px;justify-content:flex-end;">
-        <button class="btn" onclick="closeCookiesDialog()" style="padding:10px 20px;background:none;border:1px solid #2a2a4a;border-radius:10px;color:#888;cursor:pointer;font-size:.85rem;">Отмена</button>
-        <button class="btn" onclick="clearCookies()" style="padding:10px 20px;background:none;border:1px solid #ff4757;border-radius:10px;color:#ff4757;cursor:pointer;font-size:.85rem;">Очистить</button>
-        <button class="btn btn-primary" onclick="saveCookies()" style="padding:10px 20px;background:linear-gradient(135deg,#6c5ce7,#a78bfa);border:none;border-radius:10px;color:#fff;cursor:pointer;font-size:.85rem;font-weight:600;">Сохранить</button>
+        <button class="btn" onclick="closeCookiesDialog()" style="padding:10px 20px;background:none;border:1px solid #1e1e3f;border-radius:10px;color:#555;cursor:pointer;font-size:.82rem;">Отмена</button>
+        <button class="btn" onclick="clearCookies()" style="padding:10px 20px;background:none;border:1px solid rgba(255,71,87,.3);border-radius:10px;color:#ff6b6b;cursor:pointer;font-size:.82rem;">Очистить</button>
+        <button class="btn btn-primary" onclick="saveCookies()" style="padding:10px 20px;background:linear-gradient(135deg,#6c5ce7,#a78bfa);border:none;border-radius:10px;color:#fff;cursor:pointer;font-size:.82rem;font-weight:600;box-shadow:0 4px 16px rgba(108,92,231,.25);">Сохранить</button>
       </div>
-      <p id="cookiesStatus" style="font-size:.72rem;color:#666;margin-top:10px;"></p>
+      <p id="cookiesStatus" style="font-size:.68rem;color:#444;margin-top:10px;"></p>
     </div>
   </div>
 
@@ -390,7 +482,6 @@ function _human(n) {
   return n.toFixed(1) + ' TB';
 }
 
-/* ── Platform detect ─────────────────────────────────────── */
 function detectPlatform(url) {
   const u = url.toLowerCase();
   for (const p of PLATS) for (const h of p.hosts) if (u.includes(h)) return p.name;
@@ -398,14 +489,9 @@ function detectPlatform(url) {
 }
 
 function updateBadge(url) {
-  const b = document.getElementById('badge');
-  if (!url) { b.classList.remove('visible'); return; }
-  const p = detectPlatform(url);
-  b.textContent = 'Платформа: ' + (PLAT_LBL[p] || p);
-  b.className = 'platform-badge visible ' + (PLAT_CLS[p] || '');
+  // badge removed in new design
 }
 
-/* ── URL validation ──────────────────────────────────────── */
 function isValidUrl(url) {
   try { const u = new URL(url); return u.protocol === 'http:' || u.protocol === 'https:'; }
   catch { return false; }
@@ -426,7 +512,7 @@ function setMode(m) {
   renderResButtons();
 }
 
-/* ── Probe URL → fetch formats ───────────────────────────── */
+/* ── Probe URL ───────────────────────────────────────────── */
 let probeTimer = null;
 
 function scheduleProbe(url) {
@@ -435,7 +521,6 @@ function scheduleProbe(url) {
   hideProbing();
   hideResButtons();
   probedFormats = [];
-  // Debounce 400ms
   probeTimer = setTimeout(() => doProbe(url), 400);
 }
 
@@ -449,14 +534,12 @@ function doProbe(url) {
       hideProbing();
       probeAbort = null;
       if (data.error) {
-        // Server already returns a user-friendly message in data.error
         showError(data.error, null);
         return;
       }
       probedFormats = data.formats || [];
       probedAudioFormats = data.audio_formats || [];
       probedTitle = data.title || '';
-      // If no formats at all — video is unavailable
       if (!probedFormats.length && !probedAudioFormats.length) {
         showError('Ошибка', 'Неправильная ссылка или видео недоступно');
         hideResButtons();
@@ -481,7 +564,7 @@ function doProbe(url) {
 function showProbing() { document.getElementById('probing').classList.add('visible'); }
 function hideProbing() { document.getElementById('probing').classList.remove('visible'); }
 
-/* ── Render resolution buttons based on probed formats ──── */
+/* ── Render resolution buttons ───────────────────────────── */
 function renderResButtons() {
   const resContainer = document.getElementById('resButtons');
   const audioContainer = document.getElementById('audioButtons');
@@ -491,10 +574,9 @@ function renderResButtons() {
     audioContainer.innerHTML = '';
     audioContainer.classList.remove('hidden');
     if (!probedAudioFormats || !probedAudioFormats.length) {
-      // No separate audio streams — offer bestaudio/best fallback (ffmpeg will extract)
       const btn = document.createElement('button');
       btn.className = 'res-btn';
-      btn.innerHTML = `<span class="res-label">${LABEL.download_audio}</span><span class="res-meta">${LABELS.audio_from_video}</span>`;
+      btn.innerHTML = `<span class="res-label">${LABELS.download_audio}</span><span class="res-meta">${LABELS.audio_from_video}</span>`;
       btn.onclick = () => startDownloadBestAudio();
       audioContainer.appendChild(btn);
       return;
@@ -523,33 +605,19 @@ function renderResButtons() {
     return;
   }
   container.innerHTML = '';
-
-  // Determine which resolution buttons to show based on effective height
-  // For vertical videos, eff_height = width (e.g. 1080 for 1080x1920)
-  // We treat 1080 eff_height as "1080p" vertical = show single button
   const maxH = probedFormats.length ? probedFormats[0].height : 0;
   let targets = [];
-  if (maxH >= 2160) {
-    targets = [2160, 1440, 1080];  // 4K horizontal
-  } else if (maxH >= 1440) {
-    targets = [1440, 1080];        // 2K horizontal
-  } else {
-    // For vertical video (maxH ~1080) or low-res horizontal: show top 2 unique
+  if (maxH >= 2160) { targets = [2160, 1440, 1080]; }
+  else if (maxH >= 1440) { targets = [1440, 1080]; }
+  else {
     const unique = [...new Set(probedFormats.map(f => f.height))];
     targets = unique.slice(0, 2);
   }
-
-  // For each target, find the closest format >= target height
   for (const tgt of targets) {
-    // Find best format at or below target
     let best = null;
     for (const f of probedFormats) {
-      // exact match is best
       if (f.height === tgt) { best = f; break; }
-      // closest below
-      if (f.height <= tgt && (!best || f.height > best.height)) {
-        best = f;
-      }
+      if (f.height <= tgt && (!best || f.height > best.height)) { best = f; }
     }
     if (!best) continue;
     const btn = document.createElement('button');
@@ -561,7 +629,6 @@ function renderResButtons() {
     btn.onclick = () => startDownload(best.format_id, best.height);
     container.appendChild(btn);
   }
-
   container.classList.remove('hidden');
 }
 
@@ -572,11 +639,10 @@ function hideResButtons() {
   document.getElementById('videoTitle').classList.remove('visible');
 }
 
-/* ── URL input handlers ──────────────────────────────────── */
+/* ── URL input ───────────────────────────────────────────── */
 const urlInput = document.getElementById('urlInput');
 urlInput.addEventListener('input', e => {
   const url = e.target.value.trim();
-  updateBadge(url);
   if (!url) {
     urlInput.classList.remove('valid', 'invalid');
     hideResButtons();
@@ -594,20 +660,25 @@ urlInput.addEventListener('input', e => {
     clearTimeout(probeTimer);
   }
 });
-urlInput.addEventListener('paste', () =>
-  setTimeout(() => updateBadge(urlInput.value.trim()), 50));
+urlInput.addEventListener('paste', () => setTimeout(() => updateBadge(urlInput.value.trim()), 50));
+
+async function pasteClipboard() {
+  try {
+    const text = await navigator.clipboard.readText();
+    if (text) { urlInput.value = text; urlInput.dispatchEvent(new Event('input')); }
+  } catch(e) {}
+}
 
 function clearUrl() {
   urlInput.value = '';
   urlInput.classList.remove('valid', 'invalid');
   hideResButtons();
   hideError();
-  document.getElementById('badge').classList.remove('visible');
   clearTimeout(probeTimer);
   urlInput.focus();
 }
 
-/* ── Bootstrap: check if setup already done ────────────────── */
+/* ── Bootstrap ───────────────────────────────────────────── */
 let setupPoll = null;
 
 fetch('/status').then(r => r.json()).then(d => {
@@ -631,10 +702,8 @@ function startSetup() {
   const btn = document.getElementById('setupBtn');
   btn.disabled = true;
   btn.textContent = '⏳ Настраиваю…';
-
   document.getElementById('setupProgress').style.display = 'block';
   document.getElementById('setupProgress').classList.add('fade-in');
-
   fetch('/setup', { method: 'POST' }).then(r => r.json()).then(data => {
     if (data.already_done) {
       clearInterval(setupPoll);
@@ -655,7 +724,6 @@ function pollSetup() {
   fetch('/status').then(r => r.json()).then(d => {
     document.getElementById('setupBar').style.width = (d.progress || 0) + '%';
     document.getElementById('setupPct').textContent = (d.progress || 0) + '%';
-
     const PHASE_LABELS = {
       idle: '⏳ Ожидание…',
       checking: '🔍 Проверяю зависимости…',
@@ -666,14 +734,12 @@ function pollSetup() {
       error: '❌ Ошибка',
     };
     document.getElementById('setupStatus').textContent = PHASE_LABELS[d.phase] || d.phase;
-
     if (d.messages && d.messages.length > 0) {
       const last = d.messages[d.messages.length - 1];
       if (last.text && !last.text.startsWith('✅') && !last.text.startsWith('❌')) {
         document.getElementById('setupStatus').textContent = last.text;
       }
     }
-
     if (d.phase === 'done') {
       clearInterval(setupPoll);
       document.getElementById('setupStatus').textContent = '✅ Всё готово! Открываю…';
@@ -683,7 +749,6 @@ function pollSetup() {
         document.getElementById('downloadScreen').classList.add('fade-in');
       }, 1200);
     }
-
     if (d.phase === 'error') {
       clearInterval(setupPoll);
       const btn = document.getElementById('setupBtn');
@@ -693,13 +758,8 @@ function pollSetup() {
   }).catch(() => {});
 }
 
-function openFolder() {
-  fetch('/open-folder', { method: 'GET' }).catch(() => {});
-}
-
-function openLog() {
-  fetch('/open-log', { method: 'GET' }).catch(() => {});
-}
+function openFolder() { fetch('/open-folder', { method: 'GET' }).catch(() => {}); }
+function openLog() { fetch('/open-log', { method: 'GET' }).catch(() => {}); }
 
 /* ── Download ─────────────────────────────────────────────── */
 let dlPoll = null;
@@ -707,12 +767,8 @@ let dlPoll = null;
 function showError(title, message) {
   document.getElementById('errorTitle').textContent = title;
   var msgEl = document.getElementById('errorMessage');
-  if (message) {
-    msgEl.textContent = message;
-    msgEl.style.display = '';
-  } else {
-    msgEl.style.display = 'none';
-  }
+  if (message) { msgEl.textContent = message; msgEl.style.display = ''; }
+  else { msgEl.style.display = 'none'; }
   document.getElementById('dlProgress').style.display = 'block';
   document.getElementById('errorToast').classList.add('visible');
 }
@@ -739,12 +795,6 @@ function startDownloadBestAudio() {
   _startDownload(url, 'audio', '__best_audio__');
 }
 
-function startDownloadAudio(audioFormatId) {
-  const url = document.getElementById('urlInput').value.trim();
-  if (!url) return;
-  _startDownload(url, 'audio', audioFormatId || '');
-}
-
 function _startDownload(url, dlMode, formatId, height) {
   document.getElementById('dlProgress').style.display = 'block';
   document.getElementById('dlProgress').classList.add('fade-in');
@@ -753,10 +803,7 @@ function _startDownload(url, dlMode, formatId, height) {
   dlBar.style.width = '5%';
   dlBar.classList.remove('done');
   document.getElementById('dlStatus').textContent = 'Запуск…';
-
-  // Disable resolution buttons
   document.querySelectorAll('.res-btn, .big-downloads-btn').forEach(b => b.disabled = true);
-
   fetch('/download', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
@@ -764,17 +811,10 @@ function _startDownload(url, dlMode, formatId, height) {
   })
   .then(r => r.json())
   .then(data => {
-    if (data.error) {
-      showError('Ошибка', data.error);
-      enableDlButtons();
-      return;
-    }
+    if (data.error) { showError('Ошибка', data.error); enableDlButtons(); return; }
     if (data.deps_ready) {
       document.getElementById('dlStatus').textContent = '✅ Зависимости готовы, запуск…';
-      setTimeout(() => {
-        enableDlButtons();
-        _startDownload(url, dlMode, formatId, height);
-      }, 500);
+      setTimeout(() => { enableDlButtons(); _startDownload(url, dlMode, formatId, height); }, 500);
       return;
     }
     const label = (dlMode === 'audio') ? 'Аудио (MP3)' : (height ? height + 'p' : 'Видео');
@@ -800,11 +840,8 @@ function _startDownload(url, dlMode, formatId, height) {
             clearInterval(dlPoll);
             document.getElementById('dlBar').style.width = '100%';
             document.getElementById('dlBar').classList.add('done');
-            if (d.status === 'done') {
-              document.getElementById('dlStatus').textContent = '✅ Готово!';
-            } else {
-              document.getElementById('dlStatus').textContent = '❌ Ошибка загрузки';
-            }
+            if (d.status === 'done') { document.getElementById('dlStatus').textContent = '✅ Готово!'; }
+            else { document.getElementById('dlStatus').textContent = '❌ Ошибка загрузки'; }
             enableDlButtons();
           } else {
             const bar = document.getElementById('dlBar');
@@ -837,7 +874,6 @@ function closeCookiesDialog() {
 
 function closeCookiesDialogAndRetry() {
   document.getElementById('cookiesDialog').style.display = 'none';
-  // Clear error and re-probe current URL in case cookies fixed the issue
   const url = document.getElementById('urlInput').value.trim();
   if (url && isValidUrl(url)) {
     hideError();
@@ -852,23 +888,14 @@ function saveCookies() {
   if (!content) {
     status.textContent = '❌ Вставьте содержимое cookies.txt';
     status.style.color = '#ff4757';
-    // Shake the textarea to indicate error
     const ta = document.getElementById('cookiesContent');
-    ta.style.animation = 'none';
-    ta.offsetHeight; // reflow
-    ta.style.animation = 'shake .3s ease';
+    ta.style.animation = 'none'; ta.offsetHeight; ta.style.animation = 'shake .3s ease';
     return;
   }
-  // Visual feedback: disable button, show spinner
-  if (btn) {
-    btn.disabled = true;
-    btn.textContent = '⏳ Сохраняю…';
-    btn.style.opacity = '.7';
-  }
+  if (btn) { btn.disabled = true; btn.textContent = '⏳ Сохраняю…'; btn.style.opacity = '.7'; }
   let b64;
-  try {
-    b64 = btoa(unescape(encodeURIComponent(content)));
-  } catch(e) {
+  try { b64 = btoa(unescape(encodeURIComponent(content))); }
+  catch(e) {
     status.textContent = '❌ Ошибка кодирования: ' + e.message;
     status.style.color = '#ff4757';
     if (btn) { btn.disabled = false; btn.textContent = 'Сохранить'; btn.style.opacity = '1'; }
@@ -885,7 +912,6 @@ function saveCookies() {
       status.textContent = '✅ Cookies сохранены (' + content.split('\n').length + ' строк)';
       status.style.color = '#4caf50';
       if (btn) { btn.textContent = '✅ Готово'; btn.style.opacity = '1'; }
-      // Auto-close after 1.2s
       setTimeout(() => closeCookiesDialogAndRetry(), 1200);
     } else {
       status.textContent = '❌ ' + (data.error || 'Ошибка сервера');
@@ -918,38 +944,32 @@ function clearCookies() {
   .catch(() => {});
 }
 
-/* ── Drag & Drop / File input for cookies ─────────────────── */
+/* ── Drag & Drop / File input ────────────────────────────── */
 (function() {
   const dropzone = document.getElementById('cookieDropzone');
   const fileInput = document.getElementById('cookieFileInput');
   const textarea = document.getElementById('cookiesContent');
   const status = document.getElementById('cookiesStatus');
 
-  // Highlight on drag over
   ['dragenter', 'dragover'].forEach(evt => {
     dropzone.addEventListener(evt, e => {
-      e.preventDefault();
-      e.stopPropagation();
+      e.preventDefault(); e.stopPropagation();
       dropzone.style.borderColor = '#6c5ce7';
       dropzone.style.background = 'rgba(108,92,231,.08)';
     });
   });
   ['dragleave', 'drop'].forEach(evt => {
     dropzone.addEventListener(evt, e => {
-      e.preventDefault();
-      e.stopPropagation();
-      dropzone.style.borderColor = '#2a2a4a';
+      e.preventDefault(); e.stopPropagation();
+      dropzone.style.borderColor = '#1e1e3f';
       dropzone.style.background = '';
     });
   });
 
-  // Handle file drop
   dropzone.addEventListener('drop', e => {
     const file = e.dataTransfer.files[0];
     if (file) readFile(file);
   });
-
-  // Handle file input change
   fileInput.addEventListener('change', e => {
     const file = e.target.files[0];
     if (file) readFile(file);
@@ -971,16 +991,14 @@ function clearCookies() {
   }
 })();
 
-/* ── Tooltip handlers (pywebview doesn't fully support CSS :hover) ─── */
+/* ── Tooltips ─────────────────────────────────────────────── */
 (function() {
-  // Footer cookie tooltip
   var footerAnchor = document.querySelector('.cookie-tooltip-anchor');
   var footerTip = document.querySelector('.cookie-tooltip');
   if (footerAnchor && footerTip) {
     footerAnchor.onmouseenter = function() { footerTip.style.display = 'block'; };
     footerAnchor.onmouseleave = function() { footerTip.style.display = 'none'; };
   }
-  // Dialog cookie help tooltip
   var helpAnchor = document.querySelector('.cookie-help-anchor');
   var helpTip = document.querySelector('.cookie-help-tooltip');
   if (helpAnchor && helpTip) {
