@@ -127,19 +127,24 @@ def msg(text, type="info"):
 # ── Dependency checks ───────────────────────────────────────────────
 def find_system_python():
     """Find any usable Python 3.7+ on the system."""
+    global _MACOS_PATH_EXTENDED
     candidates = ["python3", "python", "py"]
     if platform.system() == "Windows":
         candidates = ["py", "python", "python3"]
 
-    # On macOS, also check Homebrew paths explicitly (may not be in PATH when launched from .app)
-    if platform.system() == "Darwin":
-        homebrew_paths = [
-            "/opt/homebrew/bin/python3",      # Apple Silicon
-            "/usr/local/bin/python3",          # Intel
-            "/opt/homebrew/bin/python",
-            "/usr/local/bin/python",
+    # On macOS, expand PATH to include Homebrew paths (bundle launches with limited PATH)
+    if platform.system() == "Darwin" and not globals().get("_MACOS_PATH_EXTENDED"):
+        _MACOS_PATH_EXTENDED = True
+        _extra_paths = [
+            "/opt/homebrew/bin", "/opt/homebrew/sbin",
+            "/usr/local/bin", "/usr/local/sbin",
+            "/usr/bin",
         ]
-        candidates = homebrew_paths + candidates
+        _current = os.environ.get("PATH", "")
+        _new_parts = [p for p in _extra_paths if p and p not in _current]
+        if _new_parts:
+            os.environ["PATH"] = os.pathsep.join(_new_parts) + os.pathsep + _current
+            log.info("macOS PATH expanded: %s", os.environ["PATH"])
 
     for c in candidates:
         p = shutil.which(c)
@@ -679,7 +684,7 @@ def _map_ytdlp_error(err_text):
     if "age" in err or "restricted" in err:
         return "Видео с возрастным ограничением — нужны cookies"
     # Fallback: return a generic friendly message
-    return "Не удалось обработать ссылку — проверьте правильность или используйте cookies 👇🏻"
+    return "Не удалось обработать ссылку — проверьте правильность или используйте cookies"
 
 # ── HTTP handler ────────────────────────────────────────────────────
 class Handler(http.server.BaseHTTPRequestHandler):
