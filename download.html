@@ -424,7 +424,7 @@
     <div style="background:#12122a;border:1px solid #2a2a4a;border-radius:20px;padding:24px;width:520px;max-width:95vw;box-shadow:0 24px 80px rgba(0,0,0,.6);">
       <h2 style="font-size:1rem;margin-bottom:6px;color:#fff;font-weight:700;">🍪 Cookies</h2>
       <p style="font-size:.78rem;color:#888;margin-bottom:10px;line-height:1.5;">
-        Перетащите файл cookies.txt или нажмите на область ниже. Также можно вставить текст вручную.
+        Перетащите файл cookies.txt или нажмите на область ниже.
       </p>
       <div id="cookieDropzone"
            onclick="document.getElementById('cookieFileInput').click()"
@@ -773,6 +773,29 @@ function pollSetup() {
       const btn = document.getElementById('setupBtn');
       btn.disabled = false;
       btn.textContent = '🔄 Попробовать снова';
+      // Show all error messages as instructions
+      if (d.messages && d.messages.length > 0) {
+        const errMsgs = d.messages.filter(m => m.type === 'err' || m.text.startsWith('❌') || m.text.startsWith('🐍'));
+        const infoMsgs = d.messages.filter(m => m.type === 'info' && !m.text.startsWith('✅'));
+        const lines = [...errMsgs, ...infoMsgs].map(m => m.text).filter(Boolean);
+        if (lines.length > 0) {
+          const statusEl = document.getElementById('setupStatus');
+          statusEl.innerHTML = lines.slice(-4).join('<br>');
+          // Show download Python button if python-related error
+          if (d.error && d.error.toLowerCase().includes('python')) {
+            const existingBtn = document.getElementById('dlPythonBtn');
+            if (!existingBtn) {
+              const dlBtn = document.createElement('button');
+              dlBtn.id = 'dlPythonBtn';
+              dlBtn.className = 'btn';
+              dlBtn.style.cssText = 'margin-top:12px;padding:8px 16px;background:linear-gradient(135deg,#6c5ce7,#a78bfa);border:none;border-radius:8px;color:#fff;cursor:pointer;font-size:.8rem;font-weight:600;';
+              dlBtn.textContent = '⬇️ Скачать Python';
+              dlBtn.onclick = () => fetch('/open-python-download', {method:'GET'}).catch(()=>{});
+              statusEl.parentNode.insertBefore(dlBtn, statusEl.nextSibling);
+            }
+          }
+        }
+      }
     }
   }).catch(() => {});
 }

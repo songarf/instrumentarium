@@ -721,6 +721,18 @@ class Handler(http.server.BaseHTTPRequestHandler):
             self._json({"ok": True})
             return
 
+        if p.path == "/open-python-download":
+            import subprocess as _sp, subprocess
+            log.info("/open-python-download")
+            if platform.system() == "Darwin":
+                _sp.Popen(["open", "https://www.python.org/downloads/macos/"])
+            elif platform.system() == "Windows":
+                _sp.Popen(["cmd", "/c", "start", "https://www.python.org/downloads/windows/"], creationflags=subprocess.CREATE_NO_WINDOW)
+            else:
+                _sp.Popen(["xdg-open", "https://www.python.org/downloads/"])
+            self._json({"ok": True})
+            return
+
         if p.path == "/status":
             # On first contact, check if setup was already done
             if setup_state["phase"] == "idle" and os.path.exists(SETUP_MARKER):
