@@ -129,13 +129,23 @@ def find_system_python():
     candidates = ["python3", "python", "py"]
     if platform.system() == "Windows":
         candidates = ["py", "python", "python3"]
+
+    # On macOS, also check Homebrew paths explicitly (may not be in PATH when launched from .app)
+    if platform.system() == "Darwin":
+        homebrew_paths = [
+            "/opt/homebrew/bin/python3",      # Apple Silicon
+            "/usr/local/bin/python3",          # Intel
+            "/opt/homebrew/bin/python",
+            "/usr/local/bin/python",
+        ]
+        candidates = homebrew_paths + candidates
+
     for c in candidates:
         p = shutil.which(c)
         if p:
             try:
                 out = subprocess.check_output([p, "--version"], stderr=subprocess.STDOUT, text=True,
                                              creationflags=subprocess.CREATE_NO_WINDOW if platform.system() == "Windows" else 0).strip()
-                # Parse version
                 parts = out.split()
                 if len(parts) >= 2:
                     ver = parts[1].split(".")
@@ -144,6 +154,22 @@ def find_system_python():
                         return p, out
             except:
                 continue
+
+    # On macOS, also try running Homebrew python directly (shutil.which may miss it)
+    if platform.system() == "Darwin":
+        for direct_path in ["/opt/homebrew/bin/python3", "/usr/local/bin/python3"]:
+            if os.path.isfile(direct_path):
+                try:
+                    out = subprocess.check_output([direct_path, "--version"], stderr=subprocess.STDOUT, text=True).strip()
+                    parts = out.split()
+                    if len(parts) >= 2:
+                        ver = parts[1].split(".")
+                        major, minor = int(ver[0]), int(ver[1])
+                        if major >= 3 and (major > 3 or minor >= 7):
+                            return direct_path, out
+                except:
+                    pass
+
     return None, None
 
 def check_ytdlp():
@@ -257,11 +283,36 @@ def install_python():
         return False
 
     if system == "Darwin":
-        msg("🍎 Установи Python:", "info")
+        # Check if Homebrew Python is available but maybe just not in PATH
+        homebrew_python = None
+        for p in ["/opt/homebrew/bin/python3", "/usr/local/bin/python3"]:
+            if os.path.isfile(p):
+                try:
+                    out = subprocess.check_output([p, "--version"], stderr=subprocess.STDOUT, text=True).strip()
+                    if "Python 3" in out:
+                        homebrew_python = p
+                        break
+                except:
+                    pass
+
+        if homebrew_python:
+            msg(f"✅ Python найден: {homebrew_python}", "ok")
+            setup_state["python_ok"] = True
+            return True
+
+        # No Python — show clear instructions
+        msg("🐍 Python 3.7+ не найден", "err")
+        msg("", "info")
+        msg("Установить Python на macOS:", "info")
+        msg("   Вариант 1 (рекомендуется):", "info")
         msg("   brew install python3", "info")
-        msg("   Или: https://www.python.org/downloads/macos/", "info")
+        msg("", "info")
+        msg("   Вариант 2:", "info")
+        msg("   Скачать с https://www.python.org/downloads/macos/", "info")
+        msg("", "info")
+        msg("После установки перезапустите приложение.", "info")
         setup_state["phase"] = "error"
-        setup_state["error"] = "Python not installed"
+        setup_state["error"] = "Python not installed — see instructions above"
         return False
 
     # Windows — auto-install

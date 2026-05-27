@@ -662,9 +662,17 @@ urlInput.addEventListener('paste', () => setTimeout(() => updateBadge(urlInput.v
 
 async function pasteClipboard() {
   try {
-    const text = await navigator.clipboard.readText();
-    if (text) { urlInput.value = text; urlInput.dispatchEvent(new Event('input')); }
+    // Clipboard API may not be available in some webviews (e.g. Cocoa)
+    if (navigator.clipboard && navigator.clipboard.readText) {
+      const text = await navigator.clipboard.readText();
+      if (text) { urlInput.value = text; urlInput.dispatchEvent(new Event('input')); return; }
+    }
   } catch(e) {}
+  // Fallback: just focus the input and let user Ctrl+V
+  urlInput.focus();
+  // Show a brief hint
+  const btn = document.querySelector('.input-clipboard');
+  if (btn) { btn.textContent = '⌨️'; setTimeout(() => btn.textContent = '📋', 2000); }
 }
 
 function clearUrl() {
