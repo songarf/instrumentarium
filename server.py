@@ -1270,7 +1270,7 @@ class JobLogger(threading.Thread):
 
         ffmpeg = _find_ffmpeg()
         ffmpeg_ok = ffmpeg is not None
-        log.info("JobLogger[%s]: ffmpeg=%s", self.job_id, ffmpeg)
+        log.info("JobLogger[%s]: ffmpeg=%s ffmpeg_ok=%s", self.job_id, ffmpeg, ffmpeg_ok)
 
         if self.mode == "audio":
             # For platforms that provide separate audio streams (YouTube, etc.),
@@ -1296,13 +1296,13 @@ class JobLogger(threading.Thread):
                 fmt = "bestvideo+bestaudio/best"
                 post = ["--merge-output-format", "mp4", "--recode-video", "mp4"]
             else:
-                # Without ffmpeg we cannot merge separate video/audio DASH
-                # streams. YouTube Shorts combined (progressive) mp4 files
-                # are capped at ~360p.  Warn user and accept the limitation.
+                # Without ffmpeg: we cannot merge separate video+audio DASH streams.
+                # YouTube Shorts / regular videos will get combined (progressive)
+                # mp4 files that are typically capped at ~360p and may have no audio.
                 fmt = "best[ext=mp4]/best"
                 post = []
                 j["log"].append(
-                    "[warn] ffmpeg not found — video quality may be limited. "
+                    "[warn] ffmpeg not found — video may have no sound. "
                     "Install ffmpeg and restart for full quality." )
 
         # Limit filename length to avoid OS errors on long titles (LinkedIn etc)
@@ -1367,6 +1367,7 @@ class JobLogger(threading.Thread):
                     idx2 = line.rfind('"', 0, idx)
                     if idx > idx2:
                         filepath = line[idx2+1:idx]
+                    j["log"].append("[info] Audio+Video merge ✓")
 
                 # Parse speed and filesize from yt-dlp progress lines
                 # Example: "[download]   5.3% of 250.00MiB at   1.23MiB/s ETA 03:25"
