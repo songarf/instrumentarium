@@ -554,6 +554,7 @@ function doProbe(url) {
       probedFormats = data.formats || [];
       probedAudioFormats = data.audio_formats || [];
       probedTitle = data.title || '';
+      currentDuration = data.duration || 0;
       if (!probedFormats.length && !probedAudioFormats.length) {
         showError('Ошибка', 'Неправильная ссылка или видео недоступно');
         hideResButtons();
