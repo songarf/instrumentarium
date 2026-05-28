@@ -111,7 +111,15 @@ if hasattr(sys, "_MEIPASS"):
 else:
     SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
 
-OUTPUT_BASE = os.path.join(_BASE_DIR, "downloads")
+# Use system Downloads folder as output directory
+import platform
+if platform.system() == "Windows":
+    DOWNLOADS_DIR = os.path.join(os.environ.get("USERPROFILE", ""), "Downloads")
+elif platform.system() == "Darwin":
+    DOWNLOADS_DIR = os.path.expanduser("~/Downloads")
+else:  # Linux
+    DOWNLOADS_DIR = os.path.expanduser("~/Downloads")
+OUTPUT_BASE = DOWNLOADS_DIR
 
 # yt-dlp binary locations — all beside the exe
 if hasattr(sys, "_MEIPASS"):
@@ -715,10 +723,9 @@ def run_setup():
 
     # ── Step 4: Ready ────────────────────────────────────────────
     setup_state["progress"] = 95
-    log.info("Creating downloads directory: %s", OUTPUT_BASE)
-    msg("📁 Создаю папку для загрузок…", "info")
+    log.info("Downloads will be saved to: %s", OUTPUT_BASE)
     os.makedirs(OUTPUT_BASE, exist_ok=True)
-    msg(f"✅ Готово! Запускаю сервер на порту {PORT}…", "ok")
+    msg(f"✅ Готово! Загрузки сохраняются в папку «Загрузки»", "ok")
     setup_state["progress"] = 100
     setup_state["phase"] = "done"
     setup_state["server_started"] = True
@@ -1003,6 +1010,53 @@ class Handler(http.server.BaseHTTPRequestHandler):
                 self._json({"error": str(e)})
             return
 
+        # ── /probe-meta: get real filesize by downloading a tiny fragment ──
+        if p.path == "/probe-meta":
+            qs = parse_qs(p.query)
+            url = qs.get("url", [""])[0].strip()
+            format_id = qs.get("format_id", [""])[0].strip()
+            if not url:
+                self._json({"error": "URL is required"})
+                return
+            yt = _find_ytdlp()
+            if not yt:
+                self._json({"error": "yt-dlp not found"})
+                return
+            import tempfile, os as _os
+            tmpdir = tempfile.mkdtemp(prefix="instr_probe_")
+            try:
+                tmpl = _os.path.join(tmpdir, "probe.%(ext)s")
+                cmd = [yt, "-f", format_id if format_id else "best",
+                       "-o", tmpl, "--no-playlist", "--no-check-certificates",
+                       "--download-sections", "*00:00:00-00:00:02",
+                       "--retries", "1", "--newline", "--quiet"]
+                if _cookies_path[0]:
+                    cmd += ["--cookies", _cookies_path[0]]
+                cmd.append(url)
+                log.info("/probe-meta: cmd=%s", " ".join(cmd))
+                proc = _popen(cmd)
+                try:
+                    stdout_data, _ = proc.communicate(timeout=30)
+                except subprocess.TimeoutExpired:
+                    proc.kill()
+                    self._json({"filesize": None, "probe_duration": 2})
+                    return
+                except Exception as e:
+                    proc.kill()
+                    self._json({"filesize": None, "probe_duration": 2, "error": str(e)})
+                    return
+                probe_files = [f for f in _os.listdir(tmpdir) if not f.startswith(".")]
+                total_size = 0
+                if probe_files:
+                    for f in probe_files:
+                        total_size += _os.path.getsize(_os.path.join(tmpdir, f))
+                self._json({"filesize": total_size if total_size > 0 else None, "probe_duration": 2})
+                log.info("/probe-meta: size=%d for format=%s", total_size, format_id)
+            finally:
+                import shutil
+                shutil.rmtree(tmpdir, errors="ignore")
+            return
+
         self.send_error(404)
 
     def do_POST(self):
@@ -1201,7 +1255,7 @@ class JobLogger(threading.Thread):
     def run(self):
         j = download_jobs[self.job_id]
         j["platform"] = detect_platform(self.url)
-        out_dir = os.path.join(OUTPUT_BASE, j["platform"])
+        out_dir = OUTPUT_BASE  # flat: all downloads go directly to system Downloads folder
         os.makedirs(out_dir, exist_ok=True)
 
         log.info("JobLogger[%s]: starting download url=%s mode=%s", self.job_id, self.url, self.mode)
@@ -1270,13 +1324,36 @@ class JobLogger(threading.Thread):
             proc = _popen(cmd)
             _active_proc[0] = proc
             log.info("JobLogger[%s]: popen returned, pid=%s", self.job_id, proc.pid)
-            # Wait for process to complete and read all output at once
-            stdout_data, _ = proc.communicate(timeout=600)
-            log.info("JobLogger[%s]: process exited, returncode=%d, output_chars=%d", self.job_id, proc.returncode, len(stdout_data))
-            # Parse output line by line
+
+            # Stream output line by line — no hard timeout.
+            # Let yt-dlp run as long as needed (slow connections, long streams).
+            # Parse speed and detect stalled downloads.
+            stdout_data = []
             filepath = None
-            for line in stdout_data.splitlines():
+            last_progress_time = time.time()
+            last_speed = None
+            STALL_INTERVAL = 15  # seconds without progress before warning
+
+            while True:
+                line = proc.stdout.readline() if proc.stdout else None
+                if not line:
+                    if proc.poll() is not None:
+                        break
+                    time.sleep(0.1)
+                    # Check for stalled download (no progress output)
+                    now = time.time()
+                    if now - last_progress_time > STALL_INTERVAL:
+                        log.warning("JobLogger[%s]: no progress output for %ds", self.job_id, STALL_INTERVAL)
+                        last_progress_time = now  # reset to avoid spam
+                        j["stall_warning"] = "Скорость загрузки 0 B/s — проверьте подключение к интернету"
+                    continue
+
+                line = line.rstrip('\n')
+                stdout_data.append(line)
                 j["log"].append(line)
+                last_progress_time = time.time()
+                j.pop("stall_warning", None)  # clear stall warning on new output
+
                 if "[download] Destination:" in line:
                     filepath = line.split("Destination:", 1)[1].strip()
                 elif line.startswith("[Merger]") and "into" in line:
@@ -1284,12 +1361,42 @@ class JobLogger(threading.Thread):
                     idx2 = line.rfind('"', 0, idx)
                     if idx > idx2:
                         filepath = line[idx2+1:idx]
-            # Log last 5 lines for quick diagnosis
-            last_lines = stdout_data.splitlines()[-5:] if stdout_data else []
-            log.info("JobLogger[%s]: last output lines: %s", self.job_id, last_lines)
+
+                # Parse speed and filesize from yt-dlp progress lines
+                # Example: "[download]   5.3% of 250.00MiB at   1.23MiB/s ETA 03:25"
+                if "[download]" in line and " at " in line and "%" in line and " of " in line:
+                    try:
+                        # Parse filesize: "of 250.00MiB"
+                        size_str = line.split(" of ")[1].split(" at ")[0].strip()
+                        j["filesize"] = _parse_speed(size_str)  # same unit parsing logic
+                    except (IndexError, ValueError):
+                        pass
+                    try:
+                        # Parse speed: "at   1.23MiB/s"
+                        speed_str = line.split(" at ")[1].split(" ")[0]
+                        j["speed"] = _parse_speed(speed_str)
+                    except (IndexError, ValueError):
+                        pass
+                elif "[download] Downloading" in line:
+                    pass  # initial line, no speed/size yet
+                elif line.startswith("[download]") and "%" in line:
+                    # Fallback speed parsing for different yt-dlp formats
+                    for part in line.split():
+                        if part.endswith("/s") and len(part) > 3:
+                            try:
+                                j["speed"] = _parse_speed(part)
+                                last_speed = j["speed"]
+                            except (IndexError, ValueError):
+                                pass
+                            break
+
+            proc.wait()
+            stdout_data_str = "\n".join(stdout_data)
+            log.info("JobLogger[%s]: process exited, returncode=%d, output_chars=%d", self.job_id, proc.returncode, len(stdout_data_str))
 
             if proc.returncode == 0:
                 j["status"] = "done"
+                j["speed"] = None
                 if filepath and os.path.exists(filepath):
                     j["filepath"] = filepath
                     j["filename"] = os.path.basename(filepath)
@@ -1306,6 +1413,7 @@ class JobLogger(threading.Thread):
                 log.info("JobLogger[%s]: download complete: %s (%s)", self.job_id, j.get("filename", "?"), _human(size))
             else:
                 j["status"] = "error"
+                j["speed"] = None
                 j["log"].append(f"[error] exit code {proc.returncode}")
                 log.error("JobLogger[%s]: download failed (exit %d), output:\n%s", self.job_id, proc.returncode, stdout_data[-500:] if stdout_data else "(empty)")
         except FileNotFoundError as e:
@@ -1320,6 +1428,26 @@ class JobLogger(threading.Thread):
         finally:
             if _active_proc[0] is proc:
                 _active_proc[0] = None
+
+def _parse_speed(s):
+    """Parse speed string like '1.23MiB/s' or '500.00KiB/s' into bytes/sec."""
+    s = s.strip()
+    mult = {'B': 1, 'K': 1024, 'M': 1024**2, 'G': 1024**3}
+    for suffix, m in mult.items():
+        s_upper = s.upper()
+        if s_upper.endswith(suffix + '/S') or s_upper.endswith(suffix + 'IB/S'):
+            try:
+                return float(s_upper.split(suffix.upper())[0].rstrip('I')) * m
+            except ValueError:
+                pass
+    # fallback: try to extract leading number
+    num = ''
+    for ch in s:
+        if ch.isdigit() or ch == '.':
+            num += ch
+        else:
+            break
+    return float(num) if num else 0
 
 def _human(n):
     for u in ['B','KB','MB','GB']:

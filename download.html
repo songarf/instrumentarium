@@ -240,7 +240,12 @@
   }
 
   .dl-progress { margin-top: 12px; }
-  .dl-status { font-size: .75rem; color: #555; margin-top: 6px; }
+  .dl-status {
+    display: flex; justify-content: space-between; align-items: center;
+    font-size: .72rem; color: #666; margin-top: 6px;
+  }
+  .dl-status-left { color: #666; }
+  .dl-status-right { color: #a78bfa; font-weight: 600; text-align: right; }
 
   /* ── Probing spinner ──────────────────────────────────────── */
   .probing { display: none; text-align: center; padding: 12px; color: #555; font-size: .8rem; }
@@ -401,7 +406,10 @@
 
     <div class="dl-progress" id="dlProgress" style="display:none">
       <div class="progress-bg"><div class="progress-bar" id="dlBar"></div></div>
-      <div class="dl-status" id="dlStatus"></div>
+      <div class="dl-status">
+        <span class="dl-status-left" id="dlStatusLeft">Подключение…</span>
+        <span class="dl-status-right" id="dlStatusRight"></span>
+      </div>
       <div class="error-toast" id="errorToast">
         <div class="title" id="errorTitle">❌ Ошибка</div>
         <div class="message" id="errorMessage"></div>
@@ -626,7 +634,22 @@ function renderResButtons() {
     const rawLabel = best.display_label || (best.height + 'p');
     const resLabel = (rawLabel && rawLabel !== "0" && rawLabel !== "0p") ? rawLabel : "Скачать видео";
     const sizeStr = best.filesize ? _human(best.filesize) : '~';
-    btn.innerHTML = `<span class="res-label">${resLabel}</span><span class="res-meta">${sizeStr} · ${best.ext.toUpperCase()}</span>`;
+    const probeUrl = '/probe-meta?url=' + encodeURIComponent(currentUrl) + '&format_id=' + encodeURIComponent(best.format_id);
+    fetch(probeUrl).then(r => r.json()).then(meta => {
+      const fs = meta.filesize;
+      const dur = meta.probe_duration || 2;
+      // Estimate full size from 2-second probe
+      let estStr = '~';
+      if (fs && fs > 0 && currentDuration && currentDuration > dur) {
+        const estimated = Math.round(fs * (currentDuration / dur));
+        estStr = '~' + _human(estimated);
+      } else if (fs && fs > 0) {
+        estStr = _human(fs);
+      }
+      btn.querySelector('.res-meta').textContent = estStr + ' · ' + best.ext.toUpperCase();
+    }).catch(() => {});
+
+    btn.innerHTML = `<span class="res-label">${resLabel}</span><span class="res-meta">~ · ${best.ext.toUpperCase()}</span>`;
     btn.onclick = () => startDownload(best.format_id, best.height);
     container.appendChild(btn);
   }
@@ -851,7 +874,8 @@ function _startDownload(url, dlMode, formatId, height) {
   const dlBar = document.getElementById('dlBar');
   dlBar.style.width = '5%';
   dlBar.classList.remove('done');
-  document.getElementById('dlStatus').textContent = 'Запуск…';
+  document.getElementById('dlStatusLeft').textContent = 'Запуск…';
+  document.getElementById('dlStatusRight').textContent = '';
   document.querySelectorAll('.res-btn, .big-downloads-btn').forEach(b => b.disabled = true);
   fetch('/download', {
     method: 'POST',
@@ -862,12 +886,13 @@ function _startDownload(url, dlMode, formatId, height) {
   .then(data => {
     if (data.error) { showError('Ошибка', data.error); enableDlButtons(); return; }
     if (data.deps_ready) {
-      document.getElementById('dlStatus').textContent = '✅ Зависимости готовы, запуск…';
+      document.getElementById('dlStatusLeft').textContent = '✅ Зависимости готовы, запуск…';
       setTimeout(() => { enableDlButtons(); _startDownload(url, dlMode, formatId, height); }, 500);
       return;
     }
     const label = (dlMode === 'audio') ? 'Аудио (MP3)' : (height ? height + 'p' : 'Видео');
-    document.getElementById('dlStatus').textContent = `📦 ${data.platform} — скачивание ${label}…`;
+    document.getElementById('dlStatusLeft').textContent = `📦 ${data.platform} — скачивание ${label}…`;
+    document.getElementById('dlStatusRight').textContent = '';
     let offset = 0;
     dlPoll = setInterval(() => {
       fetch('/log?job=' + data.job_id + '&offset=' + offset)
@@ -876,7 +901,17 @@ function _startDownload(url, dlMode, formatId, height) {
           if (d.lines) {
             const last = d.lines[d.lines.length - 1];
             if (last && !last.startsWith('[yt-dlp]') && !last.startsWith('[cmd]')) {
-              document.getElementById('dlStatus').textContent = last;
+              document.getElementById('dlStatusLeft').textContent = last;
+            }
+            // Show speed from server-parsed data
+            if (d.speed != null) {
+              document.getElementById('dlStatusRight').textContent = _humanSpeed(d.speed);
+            } else if (d.filesize != null && d.filesize > 0) {
+              document.getElementById('dlStatusRight').textContent = _human(d.filesize);
+            }
+            // Show stall warning
+            if (d.stall_warning) {
+              document.getElementById('dlStatusLeft').textContent = '⚠️ ' + d.stall_warning;
             }
             d.lines.forEach(l => {
               if (l.includes('[error]') || l.includes('ERROR') || l.includes('Error')) {
@@ -889,8 +924,9 @@ function _startDownload(url, dlMode, formatId, height) {
             clearInterval(dlPoll);
             document.getElementById('dlBar').style.width = '100%';
             document.getElementById('dlBar').classList.add('done');
-            if (d.status === 'done') { document.getElementById('dlStatus').textContent = '✅ Готово!'; }
-            else { document.getElementById('dlStatus').textContent = '❌ Ошибка загрузки'; }
+            document.getElementById('dlStatusRight').textContent = '';
+            if (d.status === 'done') { document.getElementById('dlStatusLeft').textContent = '✅ Готово!'; }
+            else { document.getElementById('dlStatusLeft').textContent = '❌ Ошибка загрузки'; }
             enableDlButtons();
           } else {
             const bar = document.getElementById('dlBar');
@@ -904,6 +940,15 @@ function _startDownload(url, dlMode, formatId, height) {
     showError('Ошибка соединения', err.message);
     enableDlButtons();
   });
+}
+
+function _humanSpeed(bytesPerSec) {
+  if (!bytesPerSec || bytesPerSec <= 0) return '';
+  const units = ['B/s', 'KB/s', 'MB/s', 'GB/s'];
+  let unitIdx = 0;
+  let val = bytesPerSec;
+  while (val >= 1024 && unitIdx < units.length - 1) { val /= 1024; unitIdx++; }
+  return val.toFixed(val >= 100 ? 0 : 1) + ' ' + units[unitIdx];
 }
 
 function enableDlButtons() {

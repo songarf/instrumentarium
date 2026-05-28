@@ -237,14 +237,13 @@ def _run_app():
         except Exception:
             pass
 
-    def _start_server_in_thread():
+    def _start_server_in_thread() -> None:
         log.info("=== Server thread starting ===")
         try:
             import server as srv
             srv.SCRIPT_DIR = _BASE_DIR
             srv._BASE_DIR = _BASE_DIR
             srv.SETUP_MARKER = os.path.join(_BASE_DIR, ".setup_done")
-            srv.OUTPUT_BASE = os.path.join(_BASE_DIR, "downloads")
             srv._LOCK_PATH = os.path.join(_BASE_DIR, ".instrumentarium.lock")
             _bin_dir = os.path.join(_BASE_DIR, ".bin")
             srv.YT_DLP_DIR = _bin_dir

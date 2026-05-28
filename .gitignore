@@ -18,7 +18,7 @@ env/
 *.swp
 *.swo
 
-# Output videos
+# Output videos (no longer created in project dir — downloads go to system Downloads folder)
 downloads/
 *.mp4
 *.mp3
@@ -47,6 +47,9 @@ auth.json
 # Project context (local notes)
 CONTEXT.md
 ONBOARDING.md
+
+# Temporary: README hidden for repo privacy
+README.md
 
 # UI config (local tuning, not for distribution)
 ui-config.json

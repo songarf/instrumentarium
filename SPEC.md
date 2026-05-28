@@ -124,19 +124,13 @@
 ├── instrumentarium.log      # Лог
 ├── .setup_done              # Маркёр настройки
 ├── .instrumentarium.lock    # Lock-файл
-├── .bin/
-│   ├── yt-dlp.exe
-│   ├── ffmpeg.exe
-│   └── ffprobe.exe
-└── downloads/
-    ├── youtube/
-    ├── twitter/
-    ├── tiktok/
-    ├── instagram/
-    ├── facebook/
-    ├── linkedin/
-    └── other/
+└── .bin/
+    ├── yt-dlp.exe
+    ├── ffmpeg.exe
+    └── ffprobe.exe
 ```
+
+Все скачанные файлы сохраняются в **системную папку «Загрузки»** пользователя (`~/Downloads` на Linux/macOS, `%USERPROFILE%\Downloads` на Windows).
 
 **Ничего не пишется в AppData, ~/.instrumentarium, или куда-либо ещё.**
 
