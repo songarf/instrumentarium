@@ -651,32 +651,31 @@ function renderResButtons() {
       return;
     }
     const probeUrl = window.location.origin + '/probe-meta?url=' + encodeURIComponent(currentUrl) + '&format_id=' + encodeURIComponent(best.format_id);
-    if (window._dbg) window._dbg.textContent += '\nprobeUrl=' + probeUrl;
-    fetch(probeUrl)
-      .then(r => {
-        if (!r.ok) throw new Error('HTTP ' + r.status);
-        return r.text().then(t => {
-          if (window._dbg) window._dbg.textContent += '\nprobe status=' + r.status + ' body=' + t.substring(0, 100);
-          return JSON.parse(t);
-        });
-      })
-      .then(meta => {
-        const fs = meta.filesize;
-        const dur = meta.probe_duration || 8;
-        let estStr = '~';
+    var xhr = new XMLHttpRequest();
+    xhr.open('GET', probeUrl, true);
+    xhr.onreadystatechange = function() {
+      if (xhr.readyState !== 4) return;
+      if (xhr.status !== 200) {
+        if (window._dbg) window._dbg.textContent += '\nXHR status=' + xhr.status;
+        return;
+      }
+      try {
+        var meta = JSON.parse(xhr.responseText);
+        var fs = meta.filesize;
+        var dur = meta.probe_duration || 8;
+        var estStr = '~';
         if (fs && fs > 0 && currentDuration && currentDuration > dur) {
-          const estimated = Math.round(fs * (currentDuration / dur));
-          estStr = '~' + _human(estimated);
+          estStr = '~' + _human(Math.round(fs * (currentDuration / dur)));
         } else if (fs && fs > 0) {
           estStr = _human(fs);
         }
         var el = btn.querySelector('.res-meta');
         if (el) el.textContent = estStr + ' · ' + best.ext.toUpperCase();
-      })
-      .catch(err => {
-        var el = btn.querySelector('.res-meta');
-        if (el) el.textContent = 'ERR · ' + best.ext.toUpperCase();
-      });
+      } catch(e) {
+        if (window._dbg) window._dbg.textContent += '\nXHR parse error: ' + e.message + ' body=' + xhr.responseText.substring(0,100);
+      }
+    };
+    xhr.send();
   }
   container.classList.remove('hidden');
 }
