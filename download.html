@@ -427,6 +427,7 @@
         <span class="cookie-tooltip" style="display:none;position:absolute;bottom:140%;left:50%;transform:translateX(-50%);background:#1a1a2e;border:1px solid #2a2a4a;border-radius:8px;padding:8px 12px;font-size:.68rem;color:#aaa;width:220px;text-align:center;line-height:1.4;box-shadow:0 4px 20px rgba(0,0,0,.5);z-index:100;pointer-events:none;">Используйте cookies, чтобы скачать видео из приватных страниц, доступных только после входа в аккаунт</span>
       </span>
     </p>
+    <div id="dbg" style="display:none"></div>
   </div>
 
   <!-- ═══════════════════════════════════════════════════════ -->
@@ -465,6 +466,9 @@
 </div>
 
 <script>
+/* ── Debug ───────────────────────────────────────────── */
+window._dbg = document.getElementById('dbg');
+
 /* ── Constants ───────────────────────────────────────────── */
 const LABELS = {
   download_video:  'Скачать видео',
@@ -645,10 +649,9 @@ function renderResButtons() {
     const probeUrl = '/probe-meta?url=' + encodeURIComponent(currentUrl) + '&format_id=' + encodeURIComponent(best.format_id);
     fetch(probeUrl)
       .then(r => {
-        console.log('probe response:', r.status, r.headers.get('content-type'));
         if (!r.ok) throw new Error('HTTP ' + r.status);
         return r.text().then(t => {
-          console.log('probe body:', t.substring(0, 200));
+          if (window._dbg) window._dbg.textContent += '\nprobe status=' + r.status + ' body=' + t.substring(0, 100);
           return JSON.parse(t);
         });
       })
