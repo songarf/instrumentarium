@@ -1408,6 +1408,8 @@ class JobLogger(threading.Thread):
             proc.wait()
             stdout_data_str = "\n".join(stdout_data)
             log.info("JobLogger[%s]: process exited, returncode=%d, output_chars=%d", self.job_id, proc.returncode, len(stdout_data_str))
+            if proc.returncode != 0 or "[Merger]" not in stdout_data_str:
+                log.info("JobLogger[%s]: full output:\n%s", self.job_id, stdout_data_str[:3000])
 
             if proc.returncode == 0:
                 j["status"] = "done"
