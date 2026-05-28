@@ -651,7 +651,7 @@ function renderResButtons() {
     }).catch(() => {});
 
     btn.innerHTML = `<span class="res-label">${resLabel}</span><span class="res-meta">~ · ${best.ext.toUpperCase()}</span>`;
-    btn.onclick = () => startDownload(best.format_id, best.height);
+    btn.onclick = () => _startDownload(url, 'video', best.format_id, best.height, best.acodec);
     container.appendChild(btn);
   }
   container.classList.remove('hidden');
@@ -858,9 +858,10 @@ function startDownloadAudio(audioFormatId) {
 }
 
 function startDownload(formatId, height) {
-  const url = document.getElementById('urlInput').value.trim();
-  if (!url) return;
-  _startDownload(url, 'video', formatId, height);
+  if (!currentUrl) { showError('Ошибка', 'Вставьте ссылку на видео'); return; }
+  const fmt = probedFormats.find(f => f.format_id === formatId);
+  const acodec = fmt ? fmt.acodec : '';
+  _startDownload(currentUrl, 'video', formatId, height, acodec);
 }
 
 function startDownloadBestAudio() {
@@ -869,7 +870,7 @@ function startDownloadBestAudio() {
   _startDownload(url, 'audio', '__best_audio__');
 }
 
-function _startDownload(url, dlMode, formatId, height) {
+function _startDownload(url, dlMode, formatId, height, acodec) {
   document.getElementById('dlProgress').style.display = 'block';
   document.getElementById('dlProgress').classList.add('fade-in');
   hideError();
@@ -882,7 +883,7 @@ function _startDownload(url, dlMode, formatId, height) {
   fetch('/download', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ url: url, mode: dlMode, format_id: formatId || '' })
+    body: JSON.stringify({ url: url, mode: dlMode, format_id: formatId || '', acodec: acodec || '' })
   })
   .then(r => r.json())
   .then(data => {

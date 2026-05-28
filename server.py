@@ -1137,10 +1137,11 @@ class Handler(http.server.BaseHTTPRequestHandler):
             url = body.get("url", "").strip()
             dl_mode = body.get("mode", "video")
             format_id = body.get("format_id", "")
+            req_acodec = body.get("acodec", "")
             # Fallback: if no separate audio streams, use bestaudio/best
             if dl_mode == "audio" and format_id == "__best_audio__":
                 format_id = ""  # signal to use bestaudio/best fallback
-            log.info("/download: url=%s mode=%s format_id=%s", url, dl_mode, format_id)
+            log.info("/download: url=%s mode=%s format_id=%s acodec=%s", url, dl_mode, format_id, req_acodec)
             if not url:
                 self._json({"error": "URL is required"})
                 return
@@ -1152,7 +1153,7 @@ class Handler(http.server.BaseHTTPRequestHandler):
                 self._json({"error": "yt-dlp not found — run setup first"})
                 return
             log.info("/download: yt-dlp resolved to: %s", yt)
-            JobLogger(jid, url, dl_mode, yt, format_id).start()
+            JobLogger(jid, url, dl_mode, yt, format_id, req_acodec).start()
             log.info("/download: job started, job_id=%s", jid)
             self._json({"job_id": jid, "platform": detect_platform(url)})
             return
@@ -1250,13 +1251,14 @@ def detect_platform(url):
     return "other"
 
 class JobLogger(threading.Thread):
-    def __init__(self, job_id, url, mode, yt_dlp_path, format_id=""):
+    def __init__(self, job_id, url, mode, yt_dlp_path, format_id="", acodec=""):
         super().__init__(daemon=True)
         self.job_id = job_id
         self.url = url
         self.mode = mode
         self.yt = yt_dlp_path
         self.format_id = format_id
+        self.acodec = acodec
 
     def run(self):
         j = download_jobs[self.job_id]
@@ -1283,9 +1285,15 @@ class JobLogger(threading.Thread):
             post = ["--extract-audio", "--audio-format", "mp3", "--audio-quality", "0"]
         else:
             # If a specific format_id was requested (from resolution button),
-            # use it with +bestaudio to ensure audio is included.
+            # use it. Skip +bestaudio if:
+            #   - format_id already contains "+" (merged format like "137+140")
+            #   - acodec != "none" (format already includes audio, e.g. YouTube 360p/720p progressive)
             if self.format_id:
-                fmt = f"{self.format_id}+bestaudio/best"
+                has_audio = ("+" in self.format_id) or (self.acodec and self.acodec not in ("none", ""))
+                if has_audio:
+                    fmt = self.format_id
+                else:
+                    fmt = f"{self.format_id}+bestaudio/best"
                 post = ["--merge-output-format", "mp4"]
                 if ffmpeg_ok:
                     post += ["--recode-video", "mp4"]
