@@ -1036,15 +1036,17 @@ class Handler(http.server.BaseHTTPRequestHandler):
                 cmd.append(url)
                 log.info("/probe-meta: cmd=%s", " ".join(cmd))
                 proc = _popen(cmd)
-                probe_duration = 5  # seconds to download before killing
+                probe_duration = 8  # seconds to download before killing
                 try:
                     stdout_data, _ = proc.communicate(timeout=probe_duration)
                 except subprocess.TimeoutExpired:
                     proc.kill()
                     try:
-                        proc.communicate(timeout=5)
+                        proc.wait(timeout=5)
+                    except subprocess.TimeoutExpired:
+                        pass
                     except Exception:
-                        proc.kill()
+                        pass
                 except Exception as e:
                     proc.kill()
                     self._json({"filesize": None, "probe_duration": probe_duration, "error": str(e)})
