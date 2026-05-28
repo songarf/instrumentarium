@@ -512,6 +512,7 @@ let probedFormats = [];
 let probedAudioFormats = [];
 let probedTitle = '';
 let probeAbort = null;
+let currentUrl = '';
 
 /* ── Mode toggle ─────────────────────────────────────────── */
 function setMode(m) {
@@ -565,7 +566,7 @@ function doProbe(url) {
       hideProbing();
       probeAbort = null;
       if (err.name !== 'AbortError') {
-        showError('Ошибка', 'Не удалось проверить ссылку');
+        showError('Ошибка', 'Не удалось проверить ссылку: ' + err.message);
       }
     });
 }
@@ -667,6 +668,7 @@ function hideResButtons() {
 const urlInput = document.getElementById('urlInput');
 urlInput.addEventListener('input', e => {
   const url = e.target.value.trim();
+  currentUrl = url;
   if (!url) {
     urlInput.classList.remove('valid', 'invalid');
     hideResButtons();
