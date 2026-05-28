@@ -244,8 +244,8 @@
     display: flex; justify-content: space-between; align-items: center;
     font-size: .72rem; color: #666; margin-top: 6px;
   }
-  .dl-status-left { color: #666; }
-  .dl-status-right { color: #a78bfa; font-weight: 600; text-align: right; }
+  .dl-status-left { color: #666; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 75%; }
+  .dl-status-right { color: #a78bfa; font-weight: 600; text-align: right; flex-shrink: 0; }
 
   /* ── Probing spinner ──────────────────────────────────────── */
   .probing { display: none; text-align: center; padding: 12px; color: #555; font-size: .8rem; }
@@ -901,9 +901,14 @@ function _startDownload(url, dlMode, formatId, height) {
         .then(r => r.json())
         .then(d => {
           if (d.lines) {
-            const last = d.lines[d.lines.length - 1];
-            if (last && !last.startsWith('[yt-dlp]') && !last.startsWith('[cmd]')) {
-              document.getElementById('dlStatusLeft').textContent = last;
+            // Only show [download] progress lines in the status.
+            // Filter out noisy yt-dlp prefixes like [youtube], [info], [Merger], etc.
+            const progressLines = d.lines.filter(l => /^\[download\]/.test(l) || /^\s*\d+\.\d+%/.test(l));
+            if (progressLines.length > 0) {
+              const last = progressLines[progressLines.length - 1];
+              // Trim the [download] prefix for cleaner display
+              const display = last.replace(/^\[download\]\s*/, '');
+              document.getElementById('dlStatusLeft').textContent = display;
             }
             // Show speed from server-parsed data
             if (d.speed != null) {
