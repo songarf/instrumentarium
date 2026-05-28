@@ -646,7 +646,12 @@ function renderResButtons() {
     container.appendChild(btn);
 
     // Probe for real file size — runs async AFTER button is in DOM
-    const probeUrl = '/probe-meta?url=' + encodeURIComponent(currentUrl) + '&format_id=' + encodeURIComponent(best.format_id);
+    if (!currentUrl) {
+      if (window._dbg) window._dbg.textContent += '\nSKIP probe: currentUrl is empty';
+      return;
+    }
+    const probeUrl = window.location.origin + '/probe-meta?url=' + encodeURIComponent(currentUrl) + '&format_id=' + encodeURIComponent(best.format_id);
+    if (window._dbg) window._dbg.textContent += '\nprobeUrl=' + probeUrl;
     fetch(probeUrl)
       .then(r => {
         if (!r.ok) throw new Error('HTTP ' + r.status);
