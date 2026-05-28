@@ -1022,35 +1022,39 @@ class Handler(http.server.BaseHTTPRequestHandler):
             if not yt:
                 self._json({"error": "yt-dlp not found"})
                 return
-            import tempfile, os as _os
+            import tempfile, os as _os, time as _time
             tmpdir = tempfile.mkdtemp(prefix="instr_probe_")
             try:
                 tmpl = _os.path.join(tmpdir, "probe.%(ext)s")
+                # Download for ~5 seconds then kill to estimate full size.
+                # Works with merged formats (e.g. "137+140") where --download-sections fails.
                 cmd = [yt, "-f", format_id if format_id else "best",
                        "-o", tmpl, "--no-playlist", "--no-check-certificates",
-                       "--download-sections", "*00:00:00-00:00:02",
-                       "--retries", "1", "--newline", "--quiet"]
+                       "--retries", "1", "--newline", "--no-progress"]
                 if _cookies_path[0]:
                     cmd += ["--cookies", _cookies_path[0]]
                 cmd.append(url)
                 log.info("/probe-meta: cmd=%s", " ".join(cmd))
                 proc = _popen(cmd)
+                probe_duration = 5  # seconds to download before killing
                 try:
-                    stdout_data, _ = proc.communicate(timeout=30)
+                    stdout_data, _ = proc.communicate(timeout=probe_duration)
                 except subprocess.TimeoutExpired:
                     proc.kill()
-                    self._json({"filesize": None, "probe_duration": 2})
-                    return
+                    try:
+                        proc.communicate(timeout=5)
+                    except Exception:
+                        proc.kill()
                 except Exception as e:
                     proc.kill()
-                    self._json({"filesize": None, "probe_duration": 2, "error": str(e)})
+                    self._json({"filesize": None, "probe_duration": probe_duration, "error": str(e)})
                     return
                 probe_files = [f for f in _os.listdir(tmpdir) if not f.startswith(".")]
                 total_size = 0
                 if probe_files:
                     for f in probe_files:
                         total_size += _os.path.getsize(_os.path.join(tmpdir, f))
-                self._json({"filesize": total_size if total_size > 0 else None, "probe_duration": 2})
+                self._json({"filesize": total_size if total_size > 0 else None, "probe_duration": probe_duration})
                 log.info("/probe-meta: size=%d for format=%s", total_size, format_id)
             finally:
                 import shutil
