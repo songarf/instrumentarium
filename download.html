@@ -634,12 +634,18 @@ function renderResButtons() {
     btn.className = 'res-btn';
     const rawLabel = best.display_label || (best.height + 'p');
     const resLabel = (rawLabel && rawLabel !== "0" && rawLabel !== "0p") ? rawLabel : "Скачать видео";
-    const sizeStr = best.filesize ? _human(best.filesize) : '~';
+    btn.innerHTML = `<span class="res-label">${resLabel}</span><span class="res-meta">~ · ${best.ext.toUpperCase()}</span>`;
+    btn.onclick = () => {
+      try { startDownload(best.format_id, best.height); }
+      catch(e) { alert('startDownload error: ' + e.message); }
+    };
+    container.appendChild(btn);
+
+    // Probe for real file size — runs async AFTER button is in DOM
     const probeUrl = '/probe-meta?url=' + encodeURIComponent(currentUrl) + '&format_id=' + encodeURIComponent(best.format_id);
     fetch(probeUrl).then(r => r.json()).then(meta => {
       const fs = meta.filesize;
-      const dur = meta.probe_duration || 2;
-      // Estimate full size from 2-second probe
+      const dur = meta.probe_duration || 8;
       let estStr = '~';
       if (fs && fs > 0 && currentDuration && currentDuration > dur) {
         const estimated = Math.round(fs * (currentDuration / dur));
@@ -649,13 +655,6 @@ function renderResButtons() {
       }
       btn.querySelector('.res-meta').textContent = estStr + ' · ' + best.ext.toUpperCase();
     }).catch(() => {});
-
-    btn.innerHTML = `<span class="res-label">${resLabel}</span><span class="res-meta">~ · ${best.ext.toUpperCase()}</span>`;
-    btn.onclick = () => {
-      try { startDownload(best.format_id, best.height); }
-      catch(e) { alert('startDownload error: ' + e.message); }
-    };
-    container.appendChild(btn);
   }
   container.classList.remove('hidden');
 }
