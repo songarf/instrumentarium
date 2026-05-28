@@ -27,10 +27,27 @@ jobs:
       - name: Run tests
         run: python -m pytest tests/ -v
 
-  build-windows:
+  build:
     needs: [test]
     if: needs.test.result == 'success'
-    runs-on: windows-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-latest
+            spec: video-downloader.spec
+            artifact-name: linux-instrumentarium
+
+          - os: windows-latest
+            spec: video-downloader-win.spec
+            artifact-name: windows-instrumentarium
+
+          - os: macos-latest
+            spec: video-downloader-macos.spec
+            artifact-name: macos-instrumentarium
+            is-macos: true
+
+    runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v4
 
@@ -40,60 +57,14 @@ jobs:
 
       - name: Install build deps
         shell: bash
-        run: pip install pyinstaller pywebview cefpython3
-
-      - name: Build binary
-        shell: bash
-        run: pyinstaller video-downloader-win.spec --clean --distpath dist --workpath build
-
-      - name: Upload binary as artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: windows-instrumentarium
-          path: dist/Instrumentarium*
-          retention-days: 30
-
-  build-linux:
-    needs: [test]
-    if: needs.test.result == 'success'
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-
-      - uses: actions/setup-python@v5
-        with:
-          python-version: '3.12'
-
-      - name: Install build deps
-        shell: bash
-        run: pip install pyinstaller pywebview
-
-      - name: Build binary
-        shell: bash
-        run: pyinstaller video-downloader.spec --clean --distpath dist --workpath build
-
-      - name: Upload binary as artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: linux-instrumentarium
-          path: dist/Instrumentarium*
-          retention-days: 30
-
-  build-macos:
-    needs: [build-linux, build-windows]
-    runs-on: macos-latest
-    steps:
-      - uses: actions/checkout@v4
-
-      - uses: actions/setup-python@v5
-        with:
-          python-version: '3.12'
-
-      - name: Install build deps
-        shell: bash
-        run: pip install pyinstaller pywebview
+        run: |
+          pip install pyinstaller pywebview
+          if [ "${{ runner.os }}" = "Windows" ]; then
+            pip install cefpython3
+          fi
 
       - name: Generate macOS icon
+        if: matrix.is-macos
         shell: bash
         run: |
           cd assets
@@ -102,11 +73,16 @@ jobs:
 
       - name: Build binary
         shell: bash
-        run: pyinstaller video-downloader-macos.spec --clean --distpath dist --workpath build
+        run: |
+          # Force clean PyInstaller cache
+          python -c "import shutil, os, sys; cache = os.path.join(os.environ.get('LOCALAPPDATA' if sys.platform=='win32' else 'HOME', ''), 'pyinstaller', 'bincache'); shutil.rmtree(cache, errors='ignore') if os.path.isdir(cache) else None"
+          pyinstaller ${{ matrix.spec }} --clean --distpath dist --workpath build
 
       - name: Sign and notarize (macOS)
+        if: matrix.is-macos
         shell: bash
         run: |
+          # Ad-hoc codesign (no Apple Developer Account needed for basic sign)
           if [ -d "dist/Instrumentarium.app" ]; then
             codesign --force --deep --sign - --entitlements assets/entitlements.plist dist/Instrumentarium.app 2>/dev/null || echo "⚠️  codesign skipped (no signing identity)"
           fi
@@ -114,6 +90,7 @@ jobs:
       - name: Prepare dist for upload
         shell: bash
         run: |
+          # Remove leftover binary from BUNDLE build (macOS leaves Instrumentarium exe beside .app)
           if [ -f "dist/Instrumentarium" ] && [ -d "dist/Instrumentarium.app" ]; then
             rm -f dist/Instrumentarium
           fi
@@ -121,13 +98,14 @@ jobs:
       - name: Upload binary as artifact
         uses: actions/upload-artifact@v4
         with:
-          name: macos-instrumentarium
-          path: dist/Instrumentarium*
+          name: ${{ matrix.artifact-name }}
+          path: |
+            dist/Instrumentarium*
           retention-days: 30
 
   release:
     if: startsWith(github.ref, 'refs/tags/v')
-    needs: [build-macos]
+    needs: [build]
     runs-on: ubuntu-latest
     permissions:
       contents: write
