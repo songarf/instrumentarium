@@ -653,8 +653,11 @@ function renderResButtons() {
       } else if (fs && fs > 0) {
         estStr = _human(fs);
       }
+      alert('probe OK: filesize=' + fs + ' dur=' + dur + ' estStr=' + estStr);
       btn.querySelector('.res-meta').textContent = estStr + ' · ' + best.ext.toUpperCase();
-    }).catch(() => {});
+    }).catch(err => {
+      alert('probe-meta error: ' + err.message);
+    });
   }
   container.classList.remove('hidden');
 }
