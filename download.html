@@ -643,21 +643,32 @@ function renderResButtons() {
 
     // Probe for real file size — runs async AFTER button is in DOM
     const probeUrl = '/probe-meta?url=' + encodeURIComponent(currentUrl) + '&format_id=' + encodeURIComponent(best.format_id);
-    fetch(probeUrl).then(r => r.json()).then(meta => {
-      const fs = meta.filesize;
-      const dur = meta.probe_duration || 8;
-      let estStr = '~';
-      if (fs && fs > 0 && currentDuration && currentDuration > dur) {
-        const estimated = Math.round(fs * (currentDuration / dur));
-        estStr = '~' + _human(estimated);
-      } else if (fs && fs > 0) {
-        estStr = _human(fs);
-      }
-      alert('probe OK: filesize=' + fs + ' dur=' + dur + ' estStr=' + estStr);
-      btn.querySelector('.res-meta').textContent = estStr + ' · ' + best.ext.toUpperCase();
-    }).catch(err => {
-      alert('probe-meta error: ' + err.message);
-    });
+    fetch(probeUrl)
+      .then(r => {
+        console.log('probe response:', r.status, r.headers.get('content-type'));
+        if (!r.ok) throw new Error('HTTP ' + r.status);
+        return r.text().then(t => {
+          console.log('probe body:', t.substring(0, 200));
+          return JSON.parse(t);
+        });
+      })
+      .then(meta => {
+        const fs = meta.filesize;
+        const dur = meta.probe_duration || 8;
+        let estStr = '~';
+        if (fs && fs > 0 && currentDuration && currentDuration > dur) {
+          const estimated = Math.round(fs * (currentDuration / dur));
+          estStr = '~' + _human(estimated);
+        } else if (fs && fs > 0) {
+          estStr = _human(fs);
+        }
+        var el = btn.querySelector('.res-meta');
+        if (el) el.textContent = estStr + ' · ' + best.ext.toUpperCase();
+      })
+      .catch(err => {
+        var el = btn.querySelector('.res-meta');
+        if (el) el.textContent = 'ERR · ' + best.ext.toUpperCase();
+      });
   }
   container.classList.remove('hidden');
 }
