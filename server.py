@@ -1294,15 +1294,17 @@ class JobLogger(threading.Thread):
                     fmt = self.format_id
                 else:
                     fmt = f"{self.format_id}+bestaudio/best"
-                post = ["--merge-output-format", "mp4"]
+                post = ["--merge-output-format", "mp4",
+                        "--postprocessor-args", "ffmpeg:-c:a aac -b:a 128k"]
                 if ffmpeg_ok:
-                    post += ["--recode-video", "mp4"]
+                    post += ["--audio-format", "aac"]
             elif ffmpeg_ok:
                 # With ffmpeg: best video + best audio, merge + recode to mp4.
                 # No container restriction on bestvideo — Shorts may have
                 # better streams in webm/VP9/AV1; ffmpeg handles recoding.
                 fmt = "bestvideo+bestaudio/best"
-                post = ["--merge-output-format", "mp4", "--recode-video", "mp4"]
+                post = ["--merge-output-format", "mp4",
+                        "--postprocessor-args", "ffmpeg:-c:a aac -b:a 128k"]
             else:
                 # Without ffmpeg: we cannot merge separate video+audio DASH streams.
                 # YouTube Shorts / regular videos will get combined (progressive)
@@ -1318,7 +1320,7 @@ class JobLogger(threading.Thread):
         out_tmpl = os.path.join(out_dir, "%(title).120s [%(id)s].%(ext)s")
         cmd = [self.yt, "-f", fmt, *post, "-o", out_tmpl,
                "--no-playlist", "--retries", "3",
-               "--newline", "--progress"]
+               "--newline", "--progress", "--force-overwrites"]
         if _cookies_path[0]:
             cmd += ["--cookies", _cookies_path[0]]
         cmd.append(self.url)
