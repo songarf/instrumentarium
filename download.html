@@ -651,7 +651,10 @@ function renderResButtons() {
     }).catch(() => {});
 
     btn.innerHTML = `<span class="res-label">${resLabel}</span><span class="res-meta">~ · ${best.ext.toUpperCase()}</span>`;
-    btn.onclick = () => _startDownload(url, 'video', best.format_id, best.height, best.acodec);
+    btn.onclick = () => {
+      try { startDownload(best.format_id, best.height); }
+      catch(e) { alert('startDownload error: ' + e.message); }
+    };
     container.appendChild(btn);
   }
   container.classList.remove('hidden');
@@ -865,9 +868,8 @@ function startDownload(formatId, height) {
 }
 
 function startDownloadBestAudio() {
-  const url = document.getElementById('urlInput').value.trim();
-  if (!url) return;
-  _startDownload(url, 'audio', '__best_audio__');
+  if (!currentUrl) { showError('Ошибка', 'Вставьте ссылку на видео'); return; }
+  _startDownload(currentUrl, 'audio', '__best_audio__');
 }
 
 function _startDownload(url, dlMode, formatId, height, acodec) {
